@@ -368,7 +368,7 @@ export function exerciseListRows(
   return rows;
 }
 
-/** Merge stored library with built-ins so new default metadata (e.g. secondaries) applies. */
+/** Merge stored library with built-ins so new default metadata applies. */
 export function mergeExerciseLibrary(stored: Exercise[]): Exercise[] {
   const byId = new Map(stored.map((e) => [e.id, normalizeExercise(e)]));
   for (const def of DEFAULT_EXERCISES) {
