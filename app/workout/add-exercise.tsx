@@ -12,6 +12,7 @@ import {
   Badge,
   Body,
   Button,
+  FilterChips,
   Input,
   Muted,
   Screen,
@@ -19,15 +20,21 @@ import {
   useTheme,
 } from '@/components/ui';
 import { useWorkouts } from '@/context/WorkoutContext';
-import { MUSCLE_GROUPS } from '@/lib/exercises';
-import type { Exercise, MuscleGroup } from '@/types/workout';
+import {
+  EQUIPMENT_TYPES,
+  MUSCLE_GROUPS,
+  exerciseListRows,
+  normalizeEquipment,
+} from '@/lib/exercises';
+import type { Equipment, Exercise, MuscleGroup } from '@/types/workout';
 
 export default function AddExerciseScreen() {
   const theme = useTheme();
   const { exercises, activeWorkout, addExerciseToActive, addCustomExercise } =
     useWorkouts();
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<MuscleGroup | 'All'>('All');
+  const [filter, setFilter] = useState<MuscleGroup>('Chest');
+  const [equipmentFilter, setEquipmentFilter] = useState<Equipment | 'All'>('All');
 
   const alreadyAdded = useMemo(
     () => new Set(activeWorkout?.exercises.map((e) => e.exerciseId) ?? []),
@@ -38,10 +45,18 @@ export default function AddExerciseScreen() {
     const q = query.trim().toLowerCase();
     return exercises.filter((ex) => {
       const matchesQuery = !q || ex.name.toLowerCase().includes(q);
-      const matchesGroup = filter === 'All' || ex.muscleGroup === filter;
-      return matchesQuery && matchesGroup;
+      const matchesGroup = ex.muscleGroup === filter;
+      const matchesEquipment =
+        equipmentFilter === 'All' ||
+        normalizeEquipment(ex.equipment) === equipmentFilter;
+      return matchesQuery && matchesGroup && matchesEquipment;
     });
-  }, [exercises, query, filter]);
+  }, [exercises, query, filter, equipmentFilter]);
+
+  const rows = useMemo(
+    () => exerciseListRows(filtered, equipmentFilter === 'All'),
+    [filtered, equipmentFilter]
+  );
 
   if (!activeWorkout) {
     return (
@@ -67,8 +82,9 @@ export default function AddExerciseScreen() {
       Alert.alert('Enter a name', 'Type an exercise name above, then create it.');
       return;
     }
-    const group = filter === 'All' ? 'Full Body' : filter;
-    const exercise = await addCustomExercise(name, group);
+    const equipment =
+      equipmentFilter === 'All' ? 'Barbell / Dumbbell' : equipmentFilter;
+    const exercise = await addCustomExercise(name, filter, undefined, equipment);
     await addExerciseToActive(exercise);
     router.back();
   };
@@ -77,12 +93,14 @@ export default function AddExerciseScreen() {
     <Screen>
       <Stack.Screen options={{ title: 'Add Exercise' }} />
       <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
+        data={rows}
+        keyExtractor={(item) => item.key}
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View style={{ gap: 12, marginBottom: 8 }}>
-            <Subtitle>Pick from the library or create a custom exercise.</Subtitle>
+            <Subtitle>
+              Pick from the library. Filter to Bodyweight if you don’t have machines.
+            </Subtitle>
             <Input
               value={query}
               onChangeText={setQuery}
@@ -90,34 +108,17 @@ export default function AddExerciseScreen() {
               autoCorrect={false}
               clearButtonMode="while-editing"
             />
-            <FlatList
-              horizontal
-              data={['All', ...MUSCLE_GROUPS] as const}
-              keyExtractor={(item) => item}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8 }}
-              renderItem={({ item }) => {
-                const selected = filter === item;
-                return (
-                  <Pressable
-                    onPress={() => setFilter(item)}
-                    style={{
-                      backgroundColor: selected ? theme.tint : theme.muted,
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      borderRadius: 999,
-                    }}>
-                    <Body
-                      style={{
-                        color: selected ? '#fff' : theme.text,
-                        fontSize: 13,
-                        fontWeight: '600',
-                      }}>
-                      {item}
-                    </Body>
-                  </Pressable>
-                );
-              }}
+            <Muted>Muscle</Muted>
+            <FilterChips
+              options={MUSCLE_GROUPS}
+              value={filter}
+              onChange={setFilter}
+            />
+            <Muted>Equipment</Muted>
+            <FilterChips
+              options={['All', ...EQUIPMENT_TYPES] as const}
+              value={equipmentFilter}
+              onChange={setEquipmentFilter}
             />
             {query.trim() ? (
               <Button
@@ -129,10 +130,19 @@ export default function AddExerciseScreen() {
           </View>
         }
         renderItem={({ item }) => {
-          const added = alreadyAdded.has(item.id);
+          if (item.type === 'header') {
+            return (
+              <Muted style={{ marginTop: 8, marginBottom: 6, fontWeight: '700' }}>
+                {item.title}
+              </Muted>
+            );
+          }
+
+          const exercise = item.exercise;
+          const added = alreadyAdded.has(exercise.id);
           return (
             <Pressable
-              onPress={() => void onSelect(item)}
+              onPress={() => void onSelect(exercise)}
               disabled={added}
               style={({ pressed }) => [
                 styles.card,
@@ -143,10 +153,14 @@ export default function AddExerciseScreen() {
                 },
               ]}>
               <View style={styles.rowBetween}>
-                <Body style={{ fontWeight: '700', flex: 1 }}>{item.name}</Body>
-                {added ? <Badge label="Added" /> : <Badge label={item.muscleGroup} />}
+                <Body style={{ fontWeight: '700', flex: 1 }}>{exercise.name}</Body>
+                {added ? <Badge label="Added" /> : null}
               </View>
-              {!added ? <Muted style={{ marginTop: 6 }}>{item.muscleGroup}</Muted> : null}
+              {!added ? (
+                <Muted style={{ marginTop: 6 }}>
+                  {exercise.muscleGroup} · {normalizeEquipment(exercise.equipment)}
+                </Muted>
+              ) : null}
             </Pressable>
           );
         }}

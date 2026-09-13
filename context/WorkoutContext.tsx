@@ -4,10 +4,16 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
-import { DEFAULT_EXERCISES } from '@/lib/exercises';
+import {
+  DEFAULT_EXERCISES,
+  mergeExerciseLibrary,
+  normalizeEquipment,
+  normalizeSecondaryMuscleGroups,
+} from '@/lib/exercises';
 import { createId } from '@/lib/id';
 import {
   getExerciseProgress,
@@ -31,6 +37,7 @@ import {
   saveWorkouts,
 } from '@/lib/storage';
 import type {
+  Equipment,
   Exercise,
   MuscleGroup,
   SetEntry,
@@ -66,7 +73,12 @@ type WorkoutContextValue = {
   discardActiveWorkout: () => Promise<void>;
   deleteWorkout: (id: string) => Promise<void>;
   getWorkout: (id: string) => Workout | undefined;
-  addCustomExercise: (name: string, muscleGroup: MuscleGroup) => Promise<Exercise>;
+  addCustomExercise: (
+    name: string,
+    muscleGroup: MuscleGroup,
+    secondaryMuscleGroups?: MuscleGroup[],
+    equipment?: Equipment
+  ) => Promise<Exercise>;
   deleteCustomExercise: (id: string) => Promise<void>;
   getProgressFor: (exerciseId: string) => ExerciseProgress | undefined;
   getAlternatives: (exerciseId: string) => Exercise[];
@@ -90,6 +102,9 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [exercises, setExercises] = useState<Exercise[]>(DEFAULT_EXERCISES);
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
   const [dismissedSuggestions, setDismissedSuggestions] = useState<string[]>([]);
+  const desiredActiveRef = useRef<Workout | null>(null);
+  const activeSaveChain = useRef(Promise.resolve());
+  const discardedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,18 +122,15 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
       setWorkouts(storedWorkouts);
       if (storedExercises && storedExercises.length > 0) {
-        // Merge any new built-in exercises the user doesn't have yet
-        const byId = new Map(storedExercises.map((e) => [e.id, e]));
-        for (const def of DEFAULT_EXERCISES) {
-          if (!byId.has(def.id)) byId.set(def.id, def);
-        }
-        const merged = [...byId.values()];
+        const merged = mergeExerciseLibrary(storedExercises);
         setExercises(merged);
         await saveExercises(merged);
       } else {
         setExercises(DEFAULT_EXERCISES);
         await saveExercises(DEFAULT_EXERCISES);
       }
+      discardedRef.current = false;
+      desiredActiveRef.current = storedActive;
       setActiveWorkout(storedActive);
       setDismissedSuggestions(storedDismissed);
       setReady(true);
@@ -135,8 +147,19 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const persistActive = useCallback(async (next: Workout | null) => {
+    if (next === null) {
+      discardedRef.current = true;
+    } else if (discardedRef.current) {
+      return;
+    }
+    desiredActiveRef.current = next;
     setActiveWorkout(next);
-    await saveActiveWorkout(next);
+    // Queue writes so a late name/set save cannot resurrect a discarded workout.
+    const pending = activeSaveChain.current
+      .catch(() => undefined)
+      .then(() => saveActiveWorkout(desiredActiveRef.current));
+    activeSaveChain.current = pending;
+    await pending;
   }, []);
 
   const persistExercises = useCallback(async (next: Exercise[]) => {
@@ -145,16 +168,16 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const startWorkout = useCallback((name?: string) => {
+    discardedRef.current = false;
     const workout: Workout = {
       id: createId('workout'),
       name: name?.trim() || defaultWorkoutName(),
       startedAt: new Date().toISOString(),
       exercises: [],
     };
-    setActiveWorkout(workout);
-    void saveActiveWorkout(workout);
+    void persistActive(workout);
     return workout;
-  }, []);
+  }, [persistActive]);
 
   const updateActiveWorkout = useCallback(
     async (workout: Workout) => {
@@ -180,6 +203,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         exerciseId: exercise.id,
         exerciseName: exercise.name,
         muscleGroup: exercise.muscleGroup,
+        secondaryMuscleGroups: normalizeSecondaryMuscleGroups(
+          exercise.muscleGroup,
+          exercise.secondaryMuscleGroups
+        ),
         sets: [
           emptySet({
             reps: last ? Math.round(last.avgReps) : 8,
@@ -225,6 +252,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
             exerciseId: withExercise.id,
             exerciseName: withExercise.name,
             muscleGroup: withExercise.muscleGroup,
+            secondaryMuscleGroups: normalizeSecondaryMuscleGroups(
+              withExercise.muscleGroup,
+              withExercise.secondaryMuscleGroups
+            ),
             sets: ex.sets.map((s) => ({
               ...s,
               weight: last ? Math.round(last.avgWeight * 2) / 2 : s.weight,
@@ -348,11 +379,21 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addCustomExercise = useCallback(
-    async (name: string, muscleGroup: MuscleGroup) => {
+    async (
+      name: string,
+      muscleGroup: MuscleGroup,
+      secondaryMuscleGroups?: MuscleGroup[],
+      equipment?: Equipment
+    ) => {
       const exercise: Exercise = {
         id: createId('ex'),
         name: name.trim(),
         muscleGroup,
+        secondaryMuscleGroups: normalizeSecondaryMuscleGroups(
+          muscleGroup,
+          secondaryMuscleGroups
+        ),
+        equipment: normalizeEquipment(equipment),
         isCustom: true,
       };
       await persistExercises([exercise, ...exercises]);

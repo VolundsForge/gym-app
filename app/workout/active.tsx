@@ -11,18 +11,19 @@ import {
 } from 'react-native';
 
 import {
-  Badge,
   Body,
   Button,
   Card,
   EmptyState,
   Input,
   Muted,
+  MuscleTags,
   Screen,
   Subtitle,
   Title,
   useTheme,
 } from '@/components/ui';
+import { normalizeEquipment } from '@/lib/exercises';
 import { useWorkouts } from '@/context/WorkoutContext';
 import { formatDuration } from '@/lib/stats';
 import type { Exercise } from '@/types/workout';
@@ -40,9 +41,12 @@ export default function ActiveWorkoutScreen() {
     getAlternatives,
     finishWorkout,
     discardActiveWorkout,
+    exercises,
   } = useWorkouts();
 
   const [tick, setTick] = useState(0);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const [swapFor, setSwapFor] = useState<{
     workoutExerciseId: string;
     exerciseId: string;
@@ -55,15 +59,67 @@ export default function ActiveWorkoutScreen() {
     return () => clearInterval(id);
   }, []);
 
+  const onDiscard = () => setConfirmDiscard(true);
+
+  const confirmDiscardWorkout = async () => {
+    if (discarding) return;
+    setDiscarding(true);
+    try {
+      await discardActiveWorkout();
+      setConfirmDiscard(false);
+      router.replace('/');
+    } finally {
+      setDiscarding(false);
+    }
+  };
+
+  const discardPopup = (
+    <Modal
+      visible={confirmDiscard}
+      animationType="fade"
+      transparent
+      onRequestClose={() => {
+        if (!discarding) setConfirmDiscard(false);
+      }}>
+      <View style={styles.popupBackdrop}>
+        <View style={[styles.popupCard, { backgroundColor: theme.card }]}>
+          <Title style={{ fontSize: 22 }}>Delete this workout?</Title>
+          <Subtitle>
+            Are you sure you want to delete this workout? It will not be saved.
+          </Subtitle>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Button
+              label="No"
+              variant="secondary"
+              disabled={discarding}
+              onPress={() => setConfirmDiscard(false)}
+              style={{ flex: 1 }}
+            />
+            <Button
+              label="Yes"
+              variant="danger"
+              loading={discarding}
+              onPress={() => void confirmDiscardWorkout()}
+              style={{ flex: 1 }}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   if (!activeWorkout) {
     return (
       <Screen style={styles.centered}>
-        <EmptyState
-          title="No active workout"
-          message="Start a session from the Home tab."
-          actionLabel="Go home"
-          onAction={() => router.replace('/')}
-        />
+        {discarding ? null : (
+          <EmptyState
+            title="No active workout"
+            message="Start a session from the Home tab."
+            actionLabel="Go home"
+            onAction={() => router.replace('/')}
+          />
+        )}
+        {discardPopup}
       </Screen>
     );
   }
@@ -94,20 +150,6 @@ export default function ActiveWorkoutScreen() {
           if (finished) {
             router.replace(`/workout/${finished.id}`);
           }
-        },
-      },
-    ]);
-  };
-
-  const onDiscard = () => {
-    Alert.alert('Discard workout?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Discard',
-        style: 'destructive',
-        onPress: async () => {
-          await discardActiveWorkout();
-          router.replace('/');
         },
       },
     ]);
@@ -162,7 +204,14 @@ export default function ActiveWorkoutScreen() {
                   <Body style={{ fontWeight: '700', fontSize: 17 }}>
                     {exercise.exerciseName}
                   </Body>
-                  <Badge label={exercise.muscleGroup} />
+                  <MuscleTags
+                    primary={exercise.muscleGroup}
+                    secondary={
+                      exercise.secondaryMuscleGroups ??
+                      exercises.find((e) => e.id === exercise.exerciseId)
+                        ?.secondaryMuscleGroups
+                    }
+                  />
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 8 }}>
                   <Pressable
@@ -272,6 +321,8 @@ export default function ActiveWorkoutScreen() {
         </View>
       </ScrollView>
 
+      {discardPopup}
+
       <AlternativesModal
         visible={!!swapFor}
         title={swapFor?.name ?? ''}
@@ -326,7 +377,12 @@ function AlternativesModal({
                     styles.altRow,
                     { backgroundColor: theme.muted, borderColor: theme.border },
                   ]}>
-                  <Body style={{ fontWeight: '700', flex: 1 }}>{alt.name}</Body>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Body style={{ fontWeight: '700' }}>{alt.name}</Body>
+                    <Muted>
+                      {alt.muscleGroup} · {normalizeEquipment(alt.equipment)}
+                    </Muted>
+                  </View>
                   <Muted>Use this</Muted>
                 </Pressable>
               ))
@@ -423,6 +479,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  popupBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  popupCard: {
+    borderRadius: 20,
+    padding: 20,
+    gap: 12,
   },
   modalBackdrop: {
     flex: 1,

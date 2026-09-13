@@ -1,11 +1,14 @@
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
+import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
+import { HeaderMenuButton } from '@/components/HeaderMenu';
 import { useColorScheme } from '@/components/useColorScheme';
+import { AppThemeProvider } from '@/context/ThemeContext';
 import { WorkoutProvider } from '@/context/WorkoutContext';
 import Colors from '@/constants/Colors';
 
@@ -37,9 +40,11 @@ export default function RootLayout() {
   }
 
   return (
-    <WorkoutProvider>
-      <RootLayoutNav />
-    </WorkoutProvider>
+    <AppThemeProvider>
+      <WorkoutProvider>
+        <RootLayoutNav />
+      </WorkoutProvider>
+    </AppThemeProvider>
   );
 }
 
@@ -61,7 +66,11 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={navTheme}>
-      <Stack>
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      <Stack
+        screenOptions={{
+          headerRight: () => <HeaderMenuButton />,
+        }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
           name="workout/active"
@@ -83,6 +92,7 @@ function RootLayoutNav() {
           name="exercise/[id]"
           options={{ title: 'Exercise', headerBackTitle: 'Back' }}
         />
+        <Stack.Screen name="profile" options={{ title: 'Profile' }} />
       </Stack>
     </ThemeProvider>
   );

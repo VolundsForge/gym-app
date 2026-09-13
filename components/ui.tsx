@@ -1,5 +1,6 @@
 import {
   ActivityIndicator,
+  FlatList,
   Pressable,
   StyleSheet,
   Text as RNText,
@@ -218,7 +219,57 @@ export function StatPill({ label, value }: { label: string; value: string | numb
   );
 }
 
-export function Badge({ label }: { label: string }) {
+export function FilterChips<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: readonly T[];
+  value: T;
+  onChange: (next: T) => void;
+}) {
+  const theme = useTheme();
+  return (
+    <FlatList
+      horizontal
+      data={[...options]}
+      keyExtractor={(item) => item}
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={{ gap: 8 }}
+      renderItem={({ item }) => {
+        const selected = value === item;
+        return (
+          <Pressable
+            onPress={() => onChange(item)}
+            style={{
+              backgroundColor: selected ? theme.tint : theme.muted,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 999,
+            }}>
+            <Body
+              style={{
+                color: selected ? '#fff' : theme.text,
+                fontSize: 13,
+                fontWeight: '600',
+              }}>
+              {item}
+            </Body>
+          </Pressable>
+        );
+      }}
+    />
+  );
+}
+
+export function Badge({
+  label,
+  tone = 'primary',
+}: {
+  label: string;
+  tone?: 'primary' | 'secondary';
+}) {
   const theme = useTheme();
   return (
     <View
@@ -229,7 +280,65 @@ export function Badge({ label }: { label: string }) {
         borderRadius: 999,
         alignSelf: 'flex-start',
       }}>
-      <Muted style={{ fontWeight: '600', color: theme.tint }}>{label}</Muted>
+      <Muted
+        style={{
+          fontWeight: '600',
+          color: tone === 'primary' ? theme.tint : theme.textSecondary,
+        }}>
+        {label}
+      </Muted>
+    </View>
+  );
+}
+
+export function MuscleTags({
+  primary,
+  secondary,
+  layout = 'row',
+}: {
+  primary: string;
+  secondary?: string[];
+  layout?: 'row' | 'stacked' | 'compact';
+}) {
+  const extras = (secondary ?? []).filter((group) => group && group !== primary);
+
+  if (layout === 'compact') {
+    return (
+      <Muted>
+        {primary}
+        {extras.length ? ` · also ${extras.join(', ')}` : ''}
+      </Muted>
+    );
+  }
+
+  if (layout === 'stacked') {
+    return (
+      <View style={{ gap: 8 }}>
+        <View style={{ gap: 4 }}>
+          <Muted>Primary</Muted>
+          <Badge label={primary} />
+        </View>
+        {extras.length > 0 ? (
+          <View style={{ gap: 4 }}>
+            <Muted>Also trained</Muted>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {extras.map((group) => (
+                <Badge key={group} label={group} tone="secondary" />
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+      <Badge label={primary} />
+      {extras.length > 0 ? <Muted>also</Muted> : null}
+      {extras.map((group) => (
+        <Badge key={group} label={group} tone="secondary" />
+      ))}
     </View>
   );
 }

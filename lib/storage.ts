@@ -7,7 +7,15 @@ const KEYS = {
   exercises: '@gym/exercises',
   activeWorkout: '@gym/activeWorkout',
   dismissedSuggestions: '@gym/dismissedSuggestions',
+  colorScheme: '@gym/colorScheme',
+  profile: '@gym/profile',
 } as const;
+
+export type ColorScheme = 'light' | 'dark';
+
+export type UserProfile = {
+  name: string;
+};
 
 async function readJson<T>(key: string, fallback: T): Promise<T> {
   try {
@@ -57,4 +65,26 @@ export async function loadDismissedSuggestions(): Promise<string[]> {
 
 export async function saveDismissedSuggestions(ids: string[]): Promise<void> {
   await writeJson(KEYS.dismissedSuggestions, ids);
+}
+
+export async function loadColorScheme(): Promise<ColorScheme | null> {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.colorScheme);
+    if (raw === 'light' || raw === 'dark') return raw;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveColorScheme(scheme: ColorScheme): Promise<void> {
+  await AsyncStorage.setItem(KEYS.colorScheme, scheme);
+}
+
+export async function loadProfile(): Promise<UserProfile> {
+  return readJson<UserProfile>(KEYS.profile, { name: '' });
+}
+
+export async function saveProfile(profile: UserProfile): Promise<void> {
+  await writeJson(KEYS.profile, profile);
 }

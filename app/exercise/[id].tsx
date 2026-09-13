@@ -9,11 +9,13 @@ import {
   Card,
   EmptyState,
   Muted,
+  MuscleTags,
   Screen,
   Subtitle,
   Title,
   useTheme,
 } from '@/components/ui';
+import { getSecondaryMuscleGroups, normalizeEquipment } from '@/lib/exercises';
 import { useWorkouts } from '@/context/WorkoutContext';
 import { formatGrowth } from '@/lib/progress';
 import { progressionProgressLabel } from '@/lib/suggestions';
@@ -67,12 +69,20 @@ export default function ExerciseDetailScreen() {
     <Screen>
       <Stack.Screen options={{ title: exercise.name }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={{ gap: 6 }}>
+        <View style={{ gap: 10 }}>
           <Title style={{ fontSize: 26 }}>{exercise.name}</Title>
-          <Badge label={exercise.muscleGroup} />
+          <MuscleTags
+            primary={exercise.muscleGroup}
+            secondary={getSecondaryMuscleGroups(exercise)}
+            layout="stacked"
+          />
+          <View style={{ gap: 4 }}>
+            <Muted>Equipment</Muted>
+            <Badge label={normalizeEquipment(exercise.equipment)} />
+          </View>
           <Subtitle>
             Log sets over time to see growth. If this machine isn’t for you, grab an
-            alternative that hits the same muscle.
+            alternative that hits the same primary muscle.
           </Subtitle>
         </View>
 
@@ -143,7 +153,7 @@ export default function ExerciseDetailScreen() {
             />
           </View>
           <Subtitle>
-            Alternatives that hit the same core muscle ({exercise.muscleGroup}).
+            Alternatives that hit the same primary muscle ({exercise.muscleGroup}).
           </Subtitle>
           {showAlts ? (
             alternatives.length === 0 ? (
@@ -157,8 +167,12 @@ export default function ExerciseDetailScreen() {
                     styles.altRow,
                     { backgroundColor: theme.muted, borderColor: theme.border },
                   ]}>
-                  <Body style={{ fontWeight: '600', flex: 1 }}>{alt.name}</Body>
-                  <Muted>{alt.muscleGroup}</Muted>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Body style={{ fontWeight: '600' }}>{alt.name}</Body>
+                    <Muted>
+                      {alt.muscleGroup} · {normalizeEquipment(alt.equipment)}
+                    </Muted>
+                  </View>
                 </Pressable>
               ))
             )

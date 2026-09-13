@@ -2,10 +2,10 @@ import { router } from 'expo-router';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import {
-  Badge,
   Body,
   EmptyState,
   Muted,
+  MuscleTags,
   Screen,
   Subtitle,
   Title,
@@ -88,8 +88,11 @@ export default function ProgressScreen() {
                   {growth}
                 </Body>
               </View>
-              <View style={[styles.rowBetween, { marginTop: 8 }]}>
-                <Badge label={item.muscleGroup} />
+              <View style={{ marginTop: 8, gap: 8 }}>
+                <MuscleTags
+                  primary={item.muscleGroup}
+                  secondary={item.secondaryMuscleGroups}
+                />
                 <Muted>{item.sessions.length} sessions total</Muted>
               </View>
               <Muted style={{ marginTop: 10 }}>

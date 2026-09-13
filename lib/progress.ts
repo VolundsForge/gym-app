@@ -1,3 +1,4 @@
+import { normalizeSecondaryMuscleGroups } from '@/lib/exercises';
 import type { Exercise, MuscleGroup, Workout } from '@/types/workout';
 
 export type ExerciseSessionSnapshot = {
@@ -16,6 +17,7 @@ export type ExerciseProgress = {
   exerciseId: string;
   exerciseName: string;
   muscleGroup: MuscleGroup;
+  secondaryMuscleGroups: MuscleGroup[];
   sessions: ExerciseSessionSnapshot[];
   sessionsInLast3Months: number;
   firstSessionAt?: string;
@@ -54,6 +56,7 @@ export function buildExerciseProgressMap(
     {
       name: string;
       muscleGroup: MuscleGroup;
+      secondaryMuscleGroups: MuscleGroup[];
       sessions: ExerciseSessionSnapshot[];
     }
   >();
@@ -88,22 +91,34 @@ export function buildExerciseProgressMap(
         existing.sessions.push(snapshot);
         existing.name = ex.exerciseName;
         existing.muscleGroup = ex.muscleGroup;
+        existing.secondaryMuscleGroups = normalizeSecondaryMuscleGroups(
+          ex.muscleGroup,
+          ex.secondaryMuscleGroups
+        );
       } else {
         byExercise.set(ex.exerciseId, {
           name: ex.exerciseName,
           muscleGroup: ex.muscleGroup,
+          secondaryMuscleGroups: normalizeSecondaryMuscleGroups(
+            ex.muscleGroup,
+            ex.secondaryMuscleGroups
+          ),
           sessions: [snapshot],
         });
       }
     }
   }
 
-  // Ensure catalog names for known exercises
+  // Ensure catalog names / muscle metadata for known exercises
   for (const ex of exerciseCatalog) {
     const row = byExercise.get(ex.id);
     if (row) {
       row.name = ex.name;
       row.muscleGroup = ex.muscleGroup;
+      row.secondaryMuscleGroups = normalizeSecondaryMuscleGroups(
+        ex.muscleGroup,
+        ex.secondaryMuscleGroups
+      );
     }
   }
 
@@ -131,6 +146,7 @@ export function buildExerciseProgressMap(
       exerciseId,
       exerciseName: row.name,
       muscleGroup: row.muscleGroup,
+      secondaryMuscleGroups: row.secondaryMuscleGroups,
       sessions,
       sessionsInLast3Months,
       firstSessionAt: first?.date,

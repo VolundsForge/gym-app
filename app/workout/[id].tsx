@@ -2,12 +2,12 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
-  Badge,
   Body,
   Button,
   Card,
   EmptyState,
   Muted,
+  MuscleTags,
   Screen,
   Subtitle,
   useTheme,
@@ -23,7 +23,7 @@ import {
 export default function WorkoutDetailScreen() {
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getWorkout, deleteWorkout } = useWorkouts();
+  const { getWorkout, deleteWorkout, exercises } = useWorkouts();
   const workout = id ? getWorkout(id) : undefined;
 
   if (!workout) {
@@ -79,11 +79,18 @@ export default function WorkoutDetailScreen() {
 
         {workout.exercises.map((exercise) => (
           <Card key={exercise.id} style={{ gap: 10 }}>
-            <View style={styles.rowBetween}>
-              <Body style={{ fontWeight: '700', fontSize: 17, flex: 1 }}>
+            <View style={{ gap: 8 }}>
+              <Body style={{ fontWeight: '700', fontSize: 17 }}>
                 {exercise.exerciseName}
               </Body>
-              <Badge label={exercise.muscleGroup} />
+              <MuscleTags
+                primary={exercise.muscleGroup}
+                secondary={
+                  exercise.secondaryMuscleGroups ??
+                  exercises.find((e) => e.id === exercise.exerciseId)
+                    ?.secondaryMuscleGroups
+                }
+              />
             </View>
             {exercise.sets.map((set, index) => (
               <View

@@ -201,7 +201,7 @@ export function getProgressiveSuggestions(
   return suggestions.sort((a, b) => b.sessionCount - a.sessionCount);
 }
 
-/** Other exercises that train the same primary muscle group. */
+/** Other exercises that train the same primary muscle group (categories, not secondaries). */
 export function getAlternativeExercises(
   exerciseId: string,
   exercises: Exercise[],
