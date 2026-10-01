@@ -1,7 +1,8 @@
 import {
   ActivityIndicator,
-  FlatList,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text as RNText,
   TextInput,
@@ -11,8 +12,10 @@ import {
   type ViewProps,
 } from 'react-native';
 
-import Colors from '@/constants/Colors';
+import Colors, { Radius, Typeface } from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
+
+const typeface = Platform.OS === 'web' ? { fontFamily: Typeface.web } : null;
 
 export function useTheme() {
   const scheme = useColorScheme() ?? 'light';
@@ -36,7 +39,7 @@ export function Card({ style, ...props }: ViewProps) {
       style={[
         {
           backgroundColor: theme.card,
-          borderRadius: 16,
+          borderRadius: Radius.lg,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: theme.border,
           padding: 16,
@@ -54,10 +57,12 @@ export function Title({ style, ...props }: TextProps) {
     <RNText
       style={[
         {
+          ...typeface,
           color: theme.text,
-          fontSize: 28,
-          fontWeight: '700',
-          letterSpacing: -0.5,
+          fontSize: 30,
+          fontWeight: '600',
+          letterSpacing: -0.8,
+          lineHeight: 36,
         },
         style,
       ]}
@@ -70,7 +75,10 @@ export function Subtitle({ style, ...props }: TextProps) {
   const theme = useTheme();
   return (
     <RNText
-      style={[{ color: theme.textSecondary, fontSize: 15, lineHeight: 22 }, style]}
+      style={[
+        { ...typeface, color: theme.textSecondary, fontSize: 15, lineHeight: 22, letterSpacing: -0.1 },
+        style,
+      ]}
       {...props}
     />
   );
@@ -79,14 +87,20 @@ export function Subtitle({ style, ...props }: TextProps) {
 export function Body({ style, ...props }: TextProps) {
   const theme = useTheme();
   return (
-    <RNText style={[{ color: theme.text, fontSize: 16 }, style]} {...props} />
+    <RNText
+      style={[{ ...typeface, color: theme.text, fontSize: 16, letterSpacing: -0.15 }, style]}
+      {...props}
+    />
   );
 }
 
 export function Muted({ style, ...props }: TextProps) {
   const theme = useTheme();
   return (
-    <RNText style={[{ color: theme.textSecondary, fontSize: 13 }, style]} {...props} />
+    <RNText
+      style={[{ ...typeface, color: theme.textSecondary, fontSize: 13, letterSpacing: -0.05 }, style]}
+      {...props}
+    />
   );
 }
 
@@ -110,16 +124,16 @@ export function Button({
   const theme = useTheme();
 
   const backgrounds = {
-    primary: theme.tint,
+    primary: theme.primary,
     secondary: theme.muted,
     danger: theme.danger,
     ghost: 'transparent',
   } as const;
 
   const textColors = {
-    primary: '#FFFFFF',
+    primary: theme.onPrimary,
     secondary: theme.text,
-    danger: '#FFFFFF',
+    danger: '#FCFBF8',
     ghost: theme.tint,
   } as const;
 
@@ -130,14 +144,14 @@ export function Button({
       style={({ pressed }) => [
         {
           backgroundColor: backgrounds[variant],
-          borderRadius: 14,
+          borderRadius: Radius.md,
           paddingVertical: 14,
           paddingHorizontal: 18,
           alignItems: 'center',
           justifyContent: 'center',
-          opacity: disabled || loading ? 0.5 : pressed ? 0.85 : 1,
-          borderWidth: variant === 'ghost' ? StyleSheet.hairlineWidth : 0,
-          borderColor: theme.border,
+          opacity: disabled || loading ? 0.5 : pressed ? 0.88 : 1,
+          borderWidth: variant === 'ghost' || variant === 'secondary' ? StyleSheet.hairlineWidth : 0,
+          borderColor: variant === 'ghost' ? theme.border : theme.border,
         },
         style,
       ]}>
@@ -146,9 +160,11 @@ export function Button({
       ) : (
         <RNText
           style={{
+            ...typeface,
             color: textColors[variant],
             fontSize: 16,
-            fontWeight: '700',
+            fontWeight: '600',
+            letterSpacing: -0.2,
           }}>
           {label}
         </RNText>
@@ -165,9 +181,10 @@ export function Input(props: TextInputProps) {
       {...props}
       style={[
         {
-          backgroundColor: theme.muted,
+          ...typeface,
+          backgroundColor: theme.card,
           color: theme.text,
-          borderRadius: 12,
+          borderRadius: Radius.md,
           paddingHorizontal: 14,
           paddingVertical: 12,
           fontSize: 16,
@@ -193,7 +210,7 @@ export function EmptyState({
 }) {
   return (
     <Card style={{ alignItems: 'center', gap: 8, paddingVertical: 28 }}>
-      <Title style={{ fontSize: 20 }}>{title}</Title>
+      <Title style={{ fontSize: 20, lineHeight: 26 }}>{title}</Title>
       <Subtitle style={{ textAlign: 'center' }}>{message}</Subtitle>
       {actionLabel && onAction ? (
         <Button label={actionLabel} onPress={onAction} style={{ marginTop: 12, minWidth: 180 }} />
@@ -209,13 +226,48 @@ export function StatPill({ label, value }: { label: string; value: string | numb
       style={{
         flex: 1,
         backgroundColor: theme.muted,
-        borderRadius: 14,
+        borderRadius: Radius.md,
         padding: 14,
         gap: 4,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.border,
       }}>
       <Muted>{label}</Muted>
-      <Body style={{ fontSize: 22, fontWeight: '700' }}>{value}</Body>
+      <Body style={{ fontSize: 22, fontWeight: '600', letterSpacing: -0.4 }}>{value}</Body>
     </View>
+  );
+}
+
+export function Chip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        backgroundColor: selected ? theme.tint : theme.muted,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: Radius.pill,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: selected ? theme.tint : theme.border,
+      }}>
+      <Body
+        style={{
+          color: selected ? theme.onTint : theme.text,
+          fontSize: 13,
+          fontWeight: '600',
+        }}>
+        {label}
+      </Body>
+    </Pressable>
   );
 }
 
@@ -228,38 +280,21 @@ export function FilterChips<T extends string>({
   value: T;
   onChange: (next: T) => void;
 }) {
-  const theme = useTheme();
   return (
-    <FlatList
+    <ScrollView
       horizontal
-      data={[...options]}
-      keyExtractor={(item) => item}
       showsHorizontalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ gap: 8 }}
-      renderItem={({ item }) => {
-        const selected = value === item;
-        return (
-          <Pressable
-            onPress={() => onChange(item)}
-            style={{
-              backgroundColor: selected ? theme.tint : theme.muted,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 999,
-            }}>
-            <Body
-              style={{
-                color: selected ? '#fff' : theme.text,
-                fontSize: 13,
-                fontWeight: '600',
-              }}>
-              {item}
-            </Body>
-          </Pressable>
-        );
-      }}
-    />
+      contentContainerStyle={{ gap: 8 }}>
+      {options.map((item) => (
+        <Chip
+          key={item}
+          label={item}
+          selected={value === item}
+          onPress={() => onChange(item)}
+        />
+      ))}
+    </ScrollView>
   );
 }
 
@@ -274,11 +309,13 @@ export function Badge({
   return (
     <View
       style={{
-        backgroundColor: theme.muted,
+        backgroundColor: tone === 'primary' ? theme.tintMuted : theme.muted,
         paddingHorizontal: 10,
         paddingVertical: 4,
-        borderRadius: 999,
+        borderRadius: Radius.pill,
         alignSelf: 'flex-start',
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: tone === 'primary' ? theme.tint : theme.border,
       }}>
       <Muted
         style={{

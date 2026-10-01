@@ -15,6 +15,7 @@ import {
   Badge,
   Body,
   Button,
+  Chip,
   FilterChips,
   Input,
   Muted,
@@ -23,6 +24,7 @@ import {
   Title,
   useTheme,
 } from '@/components/ui';
+import { Radius } from '@/constants/Colors';
 import { useWorkouts } from '@/context/WorkoutContext';
 import {
   EQUIPMENT_TYPES,
@@ -193,29 +195,14 @@ export default function ExercisesScreen() {
               traveling.
             </Subtitle>
             <View style={styles.chips}>
-              {EQUIPMENT_TYPES.map((item) => {
-                const selected = equipment === item;
-                return (
-                  <Pressable
-                    key={item}
-                    onPress={() => setEquipment(item)}
-                    style={{
-                      backgroundColor: selected ? theme.tint : theme.muted,
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      borderRadius: 999,
-                    }}>
-                    <Body
-                      style={{
-                        color: selected ? '#fff' : theme.text,
-                        fontSize: 13,
-                        fontWeight: '600',
-                      }}>
-                      {item}
-                    </Body>
-                  </Pressable>
-                );
-              })}
+              {EQUIPMENT_TYPES.map((item) => (
+                <Chip
+                  key={item}
+                  label={item}
+                  selected={equipment === item}
+                  onPress={() => setEquipment(item)}
+                />
+              ))}
             </View>
             <Muted>Primary muscle</Muted>
             <Subtitle>
@@ -223,34 +210,19 @@ export default function ExercisesScreen() {
               alternatives.
             </Subtitle>
             <View style={styles.chips}>
-              {MUSCLE_GROUPS.map((group) => {
-                const selected = muscleGroup === group;
-                return (
-                  <Pressable
-                    key={group}
-                    onPress={() => {
-                      setMuscleGroup(group);
-                      setSecondaryMuscleGroups((current) =>
-                        current.filter((g) => g !== group)
-                      );
-                    }}
-                    style={{
-                      backgroundColor: selected ? theme.tint : theme.muted,
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      borderRadius: 999,
-                    }}>
-                    <Body
-                      style={{
-                        color: selected ? '#fff' : theme.text,
-                        fontSize: 13,
-                        fontWeight: '600',
-                      }}>
-                      {group}
-                    </Body>
-                  </Pressable>
-                );
-              })}
+              {MUSCLE_GROUPS.map((group) => (
+                <Chip
+                  key={group}
+                  label={group}
+                  selected={muscleGroup === group}
+                  onPress={() => {
+                    setMuscleGroup(group);
+                    setSecondaryMuscleGroups((current) =>
+                      current.filter((g) => g !== group)
+                    );
+                  }}
+                />
+              ))}
             </View>
             <Muted>Also trained (optional)</Muted>
             <Subtitle>
@@ -259,30 +231,14 @@ export default function ExercisesScreen() {
             </Subtitle>
             <View style={styles.chips}>
               {SECONDARY_MUSCLE_GROUPS.filter((group) => group !== muscleGroup).map(
-                (group) => {
-                  const selected = secondaryMuscleGroups.includes(group);
-                  return (
-                    <Pressable
-                      key={group}
-                      onPress={() => toggleSecondary(group)}
-                      style={{
-                        backgroundColor: selected ? theme.tint : theme.muted,
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                        borderRadius: 999,
-                        opacity: selected ? 1 : 0.9,
-                      }}>
-                      <Body
-                        style={{
-                          color: selected ? '#fff' : theme.text,
-                          fontSize: 13,
-                          fontWeight: '600',
-                        }}>
-                        {group}
-                      </Body>
-                    </Pressable>
-                  );
-                }
+                (group) => (
+                  <Chip
+                    key={group}
+                    label={group}
+                    selected={secondaryMuscleGroups.includes(group)}
+                    onPress={() => toggleSecondary(group)}
+                  />
+                )
               )}
             </View>
             <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -307,7 +263,7 @@ export default function ExercisesScreen() {
           styles.fab,
           { backgroundColor: theme.tint, opacity: pressed ? 0.85 : 1 },
         ]}>
-        <Ionicons name="add" size={32} color="#FFFFFF" />
+        <Ionicons name="add" size={32} color={theme.onTint} />
       </Pressable>
     </Screen>
   );
@@ -328,13 +284,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
+    boxShadow: '0 8px 20px rgba(229,106,18,0.32)',
   },
   card: {
-    borderRadius: 16,
+    borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     padding: 16,
     marginBottom: 10,
@@ -346,12 +299,12 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(28,28,28,0.4)',
     justifyContent: 'flex-end',
   },
   modalCard: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
     padding: 20,
     paddingBottom: 36,
     maxHeight: '90%',

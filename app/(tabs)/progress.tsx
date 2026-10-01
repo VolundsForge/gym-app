@@ -12,6 +12,7 @@ import {
   useTheme,
 } from '@/components/ui';
 import { useWorkouts } from '@/context/WorkoutContext';
+import { Radius } from '@/constants/Colors';
 import { formatGrowth } from '@/lib/progress';
 import { progressionProgressLabel } from '@/lib/suggestions';
 import { formatDate } from '@/lib/stats';
@@ -19,6 +20,9 @@ import { formatDate } from '@/lib/stats';
 export default function ProgressScreen() {
   const theme = useTheme();
   const { ready, progressList, startWorkout, activeWorkout } = useWorkouts();
+  const topGrowth = progressList
+    .filter((p) => p.volumeChangePct !== null && p.volumeChangePct > 0 && p.sessions.length >= 2)
+    .slice(0, 3);
 
   if (!ready) {
     return (
@@ -41,6 +45,35 @@ export default function ProgressScreen() {
               Every logged set builds a trail. Open an exercise to see progress and
               get alternatives if you want a change.
             </Subtitle>
+            {topGrowth.length > 0 ? (
+              <View style={{ gap: 8, marginTop: 8 }}>
+                <Body style={{ fontWeight: '700', fontSize: 18 }}>Growing strong</Body>
+                {topGrowth.map((p) => (
+                  <Pressable
+                    key={p.exerciseId}
+                    onPress={() => router.push(`/exercise/${p.exerciseId}`)}
+                    style={({ pressed }) => [
+                      styles.growthRow,
+                      {
+                        backgroundColor: theme.tintMuted,
+                        borderColor: theme.tint,
+                        opacity: pressed ? 0.88 : 1,
+                      },
+                    ]}>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Body style={{ fontWeight: '700' }}>{p.exerciseName}</Body>
+                      <Muted>
+                        {p.firstBestWeight} → {p.lastBestWeight} kg · {p.sessions.length}{' '}
+                        sessions
+                      </Muted>
+                    </View>
+                    <Body style={{ fontWeight: '800', color: theme.success }}>
+                      {formatGrowth(p.volumeChangePct)}
+                    </Body>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
           </View>
         }
         ListEmptyComponent={
@@ -119,8 +152,17 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     flexGrow: 1,
   },
+  growthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
   card: {
-    borderRadius: 16,
+    borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     padding: 16,
     marginBottom: 10,

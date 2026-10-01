@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { Exercise, Workout } from '@/types/workout';
+import type { Exercise, Workout, WorkoutTemplate } from '@/types/workout';
 
 const KEYS = {
   workouts: '@gym/workouts',
@@ -9,6 +9,8 @@ const KEYS = {
   dismissedSuggestions: '@gym/dismissedSuggestions',
   colorScheme: '@gym/colorScheme',
   profile: '@gym/profile',
+  templates: '@gym/templates',
+  timerEnabled: '@gym/timerEnabled',
 } as const;
 
 export type ColorScheme = 'light' | 'dark';
@@ -87,4 +89,25 @@ export async function loadProfile(): Promise<UserProfile> {
 
 export async function saveProfile(profile: UserProfile): Promise<void> {
   await writeJson(KEYS.profile, profile);
+}
+
+export async function loadTemplates(): Promise<WorkoutTemplate[]> {
+  return readJson<WorkoutTemplate[]>(KEYS.templates, []);
+}
+
+export async function saveTemplates(templates: WorkoutTemplate[]): Promise<void> {
+  await writeJson(KEYS.templates, templates);
+}
+
+export async function loadTimerEnabled(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.timerEnabled);
+    return raw === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function saveTimerEnabled(enabled: boolean): Promise<void> {
+  await AsyncStorage.setItem(KEYS.timerEnabled, enabled ? 'true' : 'false');
 }

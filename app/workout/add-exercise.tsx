@@ -19,6 +19,7 @@ import {
   Subtitle,
   useTheme,
 } from '@/components/ui';
+import { Radius } from '@/constants/Colors';
 import { useWorkouts } from '@/context/WorkoutContext';
 import {
   EQUIPMENT_TYPES,
@@ -30,16 +31,17 @@ import type { Equipment, Exercise, MuscleGroup } from '@/types/workout';
 
 export default function AddExerciseScreen() {
   const theme = useTheme();
-  const { exercises, activeWorkout, addExerciseToActive, addCustomExercise } =
+  const { exercises, activeWorkout, beginPendingExercise, addCustomExercise } =
     useWorkouts();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<MuscleGroup>('Chest');
   const [equipmentFilter, setEquipmentFilter] = useState<Equipment | 'All'>('All');
 
-  const alreadyAdded = useMemo(
-    () => new Set(activeWorkout?.exercises.map((e) => e.exerciseId) ?? []),
-    [activeWorkout]
-  );
+  const alreadyAdded = useMemo(() => {
+    const ids = activeWorkout?.exercises.map((e) => e.exerciseId) ?? [];
+    const pendingId = activeWorkout?.pendingExercise?.exerciseId;
+    return new Set(pendingId ? [...ids, pendingId] : ids);
+  }, [activeWorkout]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -72,7 +74,7 @@ export default function AddExerciseScreen() {
       Alert.alert('Already added', `${exercise.name} is already in this workout.`);
       return;
     }
-    await addExerciseToActive(exercise);
+    await beginPendingExercise(exercise);
     router.back();
   };
 
@@ -85,7 +87,7 @@ export default function AddExerciseScreen() {
     const equipment =
       equipmentFilter === 'All' ? 'Barbell / Dumbbell' : equipmentFilter;
     const exercise = await addCustomExercise(name, filter, undefined, equipment);
-    await addExerciseToActive(exercise);
+    await beginPendingExercise(exercise);
     router.back();
   };
 
@@ -99,7 +101,8 @@ export default function AddExerciseScreen() {
         ListHeaderComponent={
           <View style={{ gap: 12, marginBottom: 8 }}>
             <Subtitle>
-              Pick from the library. Filter to Bodyweight if you don’t have machines.
+              Pick one exercise. You’ll fill sets, reps, and weight on the next
+              screen, then add it to the workout.
             </Subtitle>
             <Input
               value={query}
@@ -180,7 +183,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   card: {
-    borderRadius: 16,
+    borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     padding: 16,
     marginBottom: 10,

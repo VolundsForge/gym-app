@@ -4,13 +4,16 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-naviga
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { Platform, type TextStyle } from 'react-native';
 import 'react-native-reanimated';
 
 import { HeaderMenuButton } from '@/components/HeaderMenu';
+import { WorkoutTimerHost } from '@/components/WorkoutTimerHost';
 import { useColorScheme } from '@/components/useColorScheme';
+import { SettingsProvider } from '@/context/SettingsContext';
 import { AppThemeProvider } from '@/context/ThemeContext';
 import { WorkoutProvider } from '@/context/WorkoutContext';
-import Colors from '@/constants/Colors';
+import Colors, { Typeface } from '@/constants/Colors';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -18,7 +21,9 @@ export const unstable_settings = {
   initialRouteName: '(tabs)',
 };
 
-SplashScreen.preventAutoHideAsync();
+if (Platform.OS !== 'web') {
+  SplashScreen.preventAutoHideAsync();
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -30,20 +35,23 @@ export default function RootLayout() {
   }, [error]);
 
   useEffect(() => {
-    if (loaded) {
+    if (loaded && Platform.OS !== 'web') {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
 
-  if (!loaded) {
+  if (!loaded && Platform.OS !== 'web') {
     return null;
   }
 
   return (
     <AppThemeProvider>
-      <WorkoutProvider>
-        <RootLayoutNav />
-      </WorkoutProvider>
+      <SettingsProvider>
+        <WorkoutProvider>
+          <WorkoutTimerHost />
+          <RootLayoutNav />
+        </WorkoutProvider>
+      </SettingsProvider>
     </AppThemeProvider>
   );
 }
@@ -70,6 +78,16 @@ function RootLayoutNav() {
       <Stack
         screenOptions={{
           headerRight: () => <HeaderMenuButton />,
+          headerStyle: { backgroundColor: palette.background },
+          headerShadowVisible: false,
+          headerTintColor: palette.text,
+          headerTitleStyle: {
+            fontWeight: '600',
+            letterSpacing: -0.3,
+            color: palette.text,
+            ...(Platform.OS === 'web' ? { fontFamily: Typeface.web } : null),
+          } as TextStyle,
+          contentStyle: { backgroundColor: palette.background },
         }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen

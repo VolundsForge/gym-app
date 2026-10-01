@@ -35,15 +35,30 @@ export type WorkoutExercise = {
   exerciseName: string;
   muscleGroup: MuscleGroup;
   secondaryMuscleGroups?: MuscleGroup[];
+  equipment?: Equipment;
   sets: SetEntry[];
   notes?: string;
 };
+
+export type WorkoutPhase = 'building' | 'review';
 
 export type Workout = {
   id: string;
   name: string;
   startedAt: string; // ISO
   finishedAt?: string; // ISO
+  exercises: WorkoutExercise[];
+  /** building = filling in exercises one by one; review = saved list ready to finish */
+  phase?: WorkoutPhase;
+  /** Exercise currently being filled in, not yet added to the compact list */
+  pendingExercise?: WorkoutExercise | null;
+};
+
+export type WorkoutTemplate = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
   exercises: WorkoutExercise[];
 };
 

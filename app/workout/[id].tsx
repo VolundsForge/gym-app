@@ -19,11 +19,13 @@ import {
   formatTime,
   workoutVolume,
 } from '@/lib/stats';
+import { usesWeight } from '@/lib/workout-plan';
 
 export default function WorkoutDetailScreen() {
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getWorkout, deleteWorkout, exercises } = useWorkouts();
+  const { getWorkout, deleteWorkout, exercises, activeWorkout, startFromWorkout } =
+    useWorkouts();
   const workout = id ? getWorkout(id) : undefined;
 
   if (!workout) {
@@ -104,7 +106,13 @@ export default function WorkoutDetailScreen() {
                 ]}>
                 <Muted style={{ width: 48 }}>Set {index + 1}</Muted>
                 <Body style={{ flex: 1, fontWeight: '600' }}>
-                  {set.weight} kg × {set.reps} reps
+                  {usesWeight(
+                    exercise.equipment ??
+                      exercises.find((e) => e.id === exercise.exerciseId)?.equipment,
+                    exercise.muscleGroup
+                  )
+                    ? `${set.weight} kg × ${set.reps} reps`
+                    : `${set.reps} reps`}
                 </Body>
                 <Muted>{set.completed ? 'Done' : 'Skipped'}</Muted>
               </View>
@@ -112,6 +120,17 @@ export default function WorkoutDetailScreen() {
           </Card>
         ))}
 
+        <Button
+          label={activeWorkout ? 'Continue current workout' : 'Repeat this workout'}
+          onPress={() => {
+            if (activeWorkout) {
+              router.push('/workout/active');
+              return;
+            }
+            startFromWorkout(workout);
+            router.push('/workout/active');
+          }}
+        />
         <Button label="Delete workout" variant="danger" onPress={onDelete} />
       </ScrollView>
     </Screen>

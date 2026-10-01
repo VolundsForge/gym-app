@@ -20,7 +20,60 @@ import {
   useTheme,
 } from '@/components/ui';
 import { useWorkouts } from '@/context/WorkoutContext';
-import { formatDate, formatDuration, workoutVolume } from '@/lib/stats';
+import { Radius } from '@/constants/Colors';
+import {
+  calendarDayKey,
+  calendarMonthKey,
+  formatDayHeading,
+  formatDuration,
+  formatMonthHeading,
+  formatTime,
+} from '@/lib/stats';
+import { isLoggedWorkout } from '@/lib/workout-plan';
+import type { Workout } from '@/types/workout';
+
+type HistoryRow =
+  | { type: 'month'; key: string; label: string }
+  | { type: 'day'; key: string; label: string }
+  | { type: 'workout'; key: string; workout: Workout };
+
+function historyRows(workouts: Workout[]): HistoryRow[] {
+  const sorted = [...workouts].sort(
+    (a, b) =>
+      new Date(b.finishedAt ?? b.startedAt).getTime() -
+      new Date(a.finishedAt ?? a.startedAt).getTime()
+  );
+
+  const rows: HistoryRow[] = [];
+  let lastMonth = '';
+  let lastDay = '';
+
+  for (const workout of sorted) {
+    const iso = workout.finishedAt ?? workout.startedAt;
+    const month = calendarMonthKey(iso);
+    const day = calendarDayKey(iso);
+
+    if (month !== lastMonth) {
+      rows.push({
+        type: 'month',
+        key: `month-${month}`,
+        label: formatMonthHeading(iso),
+      });
+      lastMonth = month;
+    }
+    if (day !== lastDay) {
+      rows.push({
+        type: 'day',
+        key: `day-${day}`,
+        label: formatDayHeading(iso),
+      });
+      lastDay = day;
+    }
+    rows.push({ type: 'workout', key: workout.id, workout });
+  }
+
+  return rows;
+}
 
 export default function HistoryScreen() {
   const theme = useTheme();
@@ -28,7 +81,7 @@ export default function HistoryScreen() {
   const [query, setQuery] = useState('');
 
   const finished = useMemo(() => {
-    const list = workouts.filter((w) => w.finishedAt);
+    const list = workouts.filter(isLoggedWorkout);
     const q = query.trim().toLowerCase();
     if (!q) return list;
     return list.filter(
@@ -60,13 +113,15 @@ export default function HistoryScreen() {
   return (
     <Screen>
       <FlatList
-        data={finished}
-        keyExtractor={(item) => item.id}
+        data={historyRows(finished)}
+        keyExtractor={(item) => item.key}
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View style={{ gap: 12, marginBottom: 8 }}>
             <Title>History</Title>
-            <Subtitle>Browse past sessions and search by workout or exercise name.</Subtitle>
+            <Subtitle>
+              Sessions grouped by your calendar — today, yesterday, then each date.
+            </Subtitle>
             <Input
               value={query}
               onChangeText={setQuery}
@@ -96,14 +151,28 @@ export default function HistoryScreen() {
           />
         }
         renderItem={({ item }) => {
-          const sets = item.exercises.reduce(
+          if (item.type === 'month') {
+            return (
+              <Body style={[styles.monthHeading, { color: theme.text }]}>
+                {item.label}
+              </Body>
+            );
+          }
+          if (item.type === 'day') {
+            return (
+              <Muted style={styles.dayHeading}>{item.label}</Muted>
+            );
+          }
+
+          const workout = item.workout;
+          const sets = workout.exercises.reduce(
             (n, ex) => n + ex.sets.filter((s) => s.completed).length,
             0
           );
           return (
             <Pressable
-              onPress={() => router.push(`/workout/${item.id}`)}
-              onLongPress={() => confirmDelete(item.id, item.name)}
+              onPress={() => router.push(`/workout/${workout.id}`)}
+              onLongPress={() => confirmDelete(workout.id, workout.name)}
               style={({ pressed }) => [
                 styles.card,
                 {
@@ -113,20 +182,19 @@ export default function HistoryScreen() {
                 },
               ]}>
               <View style={styles.rowBetween}>
-                <Body style={{ fontWeight: '700', flex: 1 }}>{item.name}</Body>
-                <Muted>{formatDate(item.finishedAt ?? item.startedAt)}</Muted>
+                <Body style={{ fontWeight: '700', flex: 1 }}>{workout.name}</Body>
+                <Muted>{formatTime(workout.finishedAt ?? workout.startedAt)}</Muted>
               </View>
               <Muted style={{ marginTop: 6 }}>
-                {item.exercises.length} exercises · {sets} sets ·{' '}
-                {formatDuration(item.startedAt, item.finishedAt)} ·{' '}
-                {Math.round(workoutVolume(item))} kg
+                {workout.exercises.length} exercises · {sets} sets ·{' '}
+                {formatDuration(workout.startedAt, workout.finishedAt)}
               </Muted>
               <Muted style={{ marginTop: 8 }}>
-                {item.exercises
+                {workout.exercises
                   .slice(0, 4)
                   .map((e) => e.exerciseName)
                   .join(' · ')}
-                {item.exercises.length > 4 ? '…' : ''}
+                {workout.exercises.length > 4 ? '…' : ''}
               </Muted>
             </Pressable>
           );
@@ -142,8 +210,20 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     flexGrow: 1,
   },
+  monthHeading: {
+    fontSize: 22,
+    fontWeight: '600',
+    letterSpacing: -0.4,
+    marginTop: 18,
+    marginBottom: 4,
+  },
+  dayHeading: {
+    fontWeight: '600',
+    marginTop: 10,
+    marginBottom: 6,
+  },
   card: {
-    borderRadius: 16,
+    borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     padding: 16,
     marginBottom: 10,

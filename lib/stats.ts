@@ -60,6 +60,52 @@ export function formatDate(iso: string): string {
   });
 }
 
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+export function calendarMonthKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function calendarDayKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function formatMonthHeading(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+export function formatDayHeading(iso: string): string {
+  const day = startOfLocalDay(new Date(iso)).getTime();
+  const today = startOfLocalDay(new Date()).getTime();
+  const diffDays = Math.round((today - day) / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  return new Date(iso).toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+export function formatElapsedClock(startedAt: string, now = Date.now()): string {
+  const ms = Math.max(0, now - new Date(startedAt).getTime());
+  const totalSec = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSec / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+  const mm = String(minutes).padStart(2, '0');
+  const ss = String(seconds).padStart(2, '0');
+  if (hours > 0) return `${hours}:${mm}:${ss}`;
+  return `${mm}:${ss}`;
+}
+
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, {
     hour: '2-digit',

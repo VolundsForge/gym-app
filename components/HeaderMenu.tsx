@@ -5,12 +5,14 @@ import { Modal, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Body, useTheme } from '@/components/ui';
+import { useSettings } from '@/context/SettingsContext';
 import { useAppTheme } from '@/context/ThemeContext';
 
 export function HeaderMenuButton() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { colorScheme, setColorScheme } = useAppTheme();
+  const { timerEnabled, setTimerEnabled } = useSettings();
   const [open, setOpen] = useState(false);
   const dark = colorScheme === 'dark';
 
@@ -70,9 +72,23 @@ export function HeaderMenuButton() {
               <Switch
                 value={dark}
                 onValueChange={(value) => setColorScheme(value ? 'dark' : 'light')}
-                trackColor={{ false: theme.border, true: theme.tint }}
-                thumbColor="#FFFFFF"
-                ios_backgroundColor={theme.border}
+                trackColor={{ false: theme.muted, true: theme.tint }}
+                thumbColor="#FCFBF8"
+                ios_backgroundColor={theme.muted}
+              />
+            </View>
+
+            <View style={[styles.separator, { backgroundColor: theme.border }]} />
+
+            <View style={styles.row}>
+              <Ionicons name="timer-outline" size={22} color={theme.text} />
+              <Body style={{ fontWeight: '600', flex: 1 }}>Timer on workouts</Body>
+              <Switch
+                value={timerEnabled}
+                onValueChange={setTimerEnabled}
+                trackColor={{ false: theme.muted, true: theme.tint }}
+                thumbColor="#FCFBF8"
+                ios_backgroundColor={theme.muted}
               />
             </View>
           </View>
@@ -93,15 +109,12 @@ const styles = StyleSheet.create({
   },
   menu: {
     position: 'absolute',
-    minWidth: 240,
-    borderRadius: 16,
+    minWidth: 280,
+    borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     paddingVertical: 6,
     elevation: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
+    boxShadow: '0 8px 28px rgba(28,28,28,0.16)',
   },
   row: {
     flexDirection: 'row',

@@ -31,7 +31,7 @@ export default function ExerciseDetailScreen() {
     progressiveSuggestions,
     startWorkout,
     activeWorkout,
-    addExerciseToActive,
+    beginPendingExercise,
   } = useWorkouts();
 
   const [showAlts, setShowAlts] = useState(false);
@@ -59,7 +59,7 @@ export default function ExerciseDetailScreen() {
 
   const onTrain = async () => {
     if (!activeWorkout) startWorkout();
-    await addExerciseToActive(exercise);
+    await beginPendingExercise(exercise);
     router.push('/workout/active');
   };
 
@@ -115,7 +115,7 @@ export default function ExerciseDetailScreen() {
               gap: 10,
               borderColor: theme.tint,
               borderWidth: 1,
-              backgroundColor: theme.muted,
+              backgroundColor: theme.tintMuted,
             }}>
             <Badge label="Growth tip" />
             <Body style={{ fontWeight: '700', fontSize: 17 }}>{tip.title}</Body>
@@ -233,6 +233,8 @@ function MiniStat({
         borderRadius: 14,
         padding: 12,
         gap: 4,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.border,
       }}>
       <Muted>{label}</Muted>
       <Body style={{ fontWeight: '800', fontSize: 18, color: highlight ?? theme.text }}>

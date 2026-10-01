@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { Appearance, Platform, useColorScheme as useSystemColorScheme } from 'react-native';
 
+import { Canvas } from '@/constants/Colors';
 import {
   loadColorScheme,
   saveColorScheme,
@@ -33,7 +34,10 @@ function applyNativeScheme(scheme: ColorScheme) {
   }
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
     document.documentElement.style.colorScheme = scheme;
-    document.body.style.backgroundColor = scheme === 'dark' ? '#0B1220' : '#F8FAFC';
+    if (document.body) {
+      document.body.style.backgroundColor =
+        scheme === 'dark' ? Canvas.dark : Canvas.light;
+    }
   }
 }
 

@@ -1,5 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   Badge,
@@ -9,27 +11,31 @@ import {
   EmptyState,
   Muted,
   Screen,
-  StatPill,
   Subtitle,
   Title,
   useTheme,
 } from '@/components/ui';
+import { Radius } from '@/constants/Colors';
 import { useWorkouts } from '@/context/WorkoutContext';
-import { formatGrowth } from '@/lib/progress';
-import { formatDate, formatDuration, workoutVolume } from '@/lib/stats';
+import { formatDate, formatDuration } from '@/lib/stats';
+import { isEmptyDraftWorkout, isLoggedWorkout, workoutPhase } from '@/lib/workout-plan';
+import type { WorkoutTemplate } from '@/types/workout';
 
 export default function HomeScreen() {
   const theme = useTheme();
   const {
     ready,
-    stats,
     workouts,
     activeWorkout,
     startWorkout,
+    startFromTemplate,
+    templates,
     progressiveSuggestions,
-    progressList,
     dismissSuggestion,
   } = useWorkouts();
+  const [pendingTemplate, setPendingTemplate] = useState<WorkoutTemplate | null>(
+    null
+  );
 
   if (!ready) {
     return (
@@ -39,18 +45,19 @@ export default function HomeScreen() {
     );
   }
 
-  const recent = workouts.filter((w) => w.finishedAt).slice(0, 4);
-  const topGrowth = progressList
-    .filter((p) => p.volumeChangePct !== null && p.sessions.length >= 2)
-    .slice(0, 3);
+  const logged = workouts.filter(isLoggedWorkout);
+  const recent = logged.slice(0, 3);
   const tip = progressiveSuggestions[0];
 
+  const inProgress =
+    !!activeWorkout && !isEmptyDraftWorkout(activeWorkout);
+
   const onStart = () => {
-    if (activeWorkout) {
+    if (inProgress) {
       router.push('/workout/active');
       return;
     }
-    startWorkout();
+    if (!activeWorkout) startWorkout();
     router.push('/workout/active');
   };
 
@@ -65,11 +72,64 @@ export default function HomeScreen() {
           </Subtitle>
         </View>
 
-        <View style={styles.statsRow}>
-          <StatPill label="This week" value={stats.workoutsThisWeek} />
-          <StatPill label="Total" value={stats.totalWorkouts} />
-          <StatPill label="Sets" value={stats.totalSets} />
-        </View>
+        {templates.length > 0 ? (
+          <>
+            <View style={styles.sectionHeader}>
+              <Body style={{ fontWeight: '700', fontSize: 18 }}>My Workouts</Body>
+            </View>
+            {inProgress ? (
+              <Muted>
+                Finish or discard the current workout to start one of these.
+              </Muted>
+            ) : null}
+            <View style={{ gap: 8 }}>
+              {templates.map((template) => (
+                <TemplateCard
+                  key={template.id}
+                  template={template}
+                  disabled={inProgress}
+                  onStart={() => setPendingTemplate(template)}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {inProgress ? (
+          <Card
+            style={{
+              gap: 12,
+              borderColor: theme.tint,
+              borderWidth: 1,
+              backgroundColor: theme.tintMuted,
+            }}>
+            <Badge label="In progress" />
+            <Body style={{ fontWeight: '700', fontSize: 18 }}>{activeWorkout.name}</Body>
+            <Muted>
+              Started {formatDate(activeWorkout.startedAt)} ·{' '}
+              {activeWorkout.exercises.length} exercise
+              {activeWorkout.exercises.length === 1 ? '' : 's'}
+              {workoutPhase(activeWorkout) === 'review' ? ' · ready to finish' : ''}
+            </Muted>
+            <Button
+              label={
+                workoutPhase(activeWorkout) === 'review'
+                  ? 'Review & finish'
+                  : 'Continue workout'
+              }
+              onPress={() => router.push('/workout/active')}
+            />
+          </Card>
+        ) : (
+          <Card style={{ gap: 12 }}>
+            <Body style={{ fontWeight: '700', fontSize: 18 }}>Ready to train?</Body>
+            <Subtitle>
+              Create your session, log sets and reps, and save progress that motivates
+              you over time.
+            </Subtitle>
+            <Button label="Create new workout" onPress={onStart} />
+          </Card>
+        )}
 
         {tip ? (
           <Card
@@ -77,6 +137,7 @@ export default function HomeScreen() {
               gap: 10,
               borderColor: theme.tint,
               borderWidth: 1,
+              backgroundColor: theme.tintMuted,
             }}>
             <Badge label="Strive for more" />
             <Body style={{ fontWeight: '700', fontSize: 18 }}>{tip.title}</Body>
@@ -104,110 +165,154 @@ export default function HomeScreen() {
           </Card>
         ) : null}
 
-        {activeWorkout ? (
-          <Card style={{ gap: 12, borderColor: theme.tint, borderWidth: 1 }}>
-            <Badge label="In progress" />
-            <Body style={{ fontWeight: '700', fontSize: 18 }}>{activeWorkout.name}</Body>
-            <Muted>
-              Started {formatDate(activeWorkout.startedAt)} ·{' '}
-              {activeWorkout.exercises.length} exercise
-              {activeWorkout.exercises.length === 1 ? '' : 's'}
-            </Muted>
-            <Button label="Continue workout" onPress={() => router.push('/workout/active')} />
-          </Card>
-        ) : (
-          <Card style={{ gap: 12 }}>
-            <Body style={{ fontWeight: '700', fontSize: 18 }}>Ready to train?</Body>
-            <Subtitle>
-              Create your session, log sets and reps, and save progress that motivates
-              you over time.
-            </Subtitle>
-            <Button label="Start workout" onPress={onStart} />
-          </Card>
-        )}
-
-        {topGrowth.length > 0 ? (
-          <>
-            <View style={styles.sectionHeader}>
-              <Body style={{ fontWeight: '700', fontSize: 18 }}>Growing strong</Body>
-              <Button
-                label="All progress"
-                variant="ghost"
-                onPress={() => router.push('/progress')}
-                style={{ paddingVertical: 6, paddingHorizontal: 8 }}
-              />
-            </View>
-            {topGrowth.map((p) => (
-              <Card key={p.exerciseId} style={{ gap: 6, marginBottom: 4 }}>
-                <View style={styles.rowBetween}>
-                  <Body style={{ fontWeight: '700', flex: 1 }}>{p.exerciseName}</Body>
-                  <Body style={{ fontWeight: '800', color: theme.success }}>
-                    {formatGrowth(p.volumeChangePct)}
-                  </Body>
-                </View>
-                <Muted>
-                  {p.firstBestWeight} → {p.lastBestWeight} kg · {p.sessions.length}{' '}
-                  sessions
-                </Muted>
-                <Button
-                  label="See details"
-                  variant="secondary"
-                  onPress={() => router.push(`/exercise/${p.exerciseId}`)}
-                  style={{ marginTop: 6 }}
-                />
-              </Card>
-            ))}
-          </>
-        ) : null}
-
         <View style={styles.sectionHeader}>
           <Body style={{ fontWeight: '700', fontSize: 18 }}>Recent workouts</Body>
-          {recent.length > 0 ? (
-            <Button
-              label="See all"
-              variant="ghost"
-              onPress={() => router.push('/history')}
-              style={{ paddingVertical: 6, paddingHorizontal: 8 }}
-            />
-          ) : null}
         </View>
 
         {recent.length === 0 ? (
           <EmptyState
             title="No workouts yet"
             message="Finish a session and your history becomes the fuel for growth charts and smart tips."
-            actionLabel={activeWorkout ? 'Continue workout' : 'Start first workout'}
+            actionLabel={inProgress ? 'Continue workout' : 'Start first workout'}
             onAction={onStart}
           />
         ) : (
-          recent.map((workout) => {
-            const sets = workout.exercises.reduce(
-              (n, ex) => n + ex.sets.filter((s) => s.completed).length,
-              0
-            );
-            return (
-              <Card key={workout.id} style={{ gap: 6, marginBottom: 10 }}>
-                <View style={styles.rowBetween}>
-                  <Body style={{ fontWeight: '700', flex: 1 }}>{workout.name}</Body>
-                  <Muted>{formatDate(workout.finishedAt ?? workout.startedAt)}</Muted>
-                </View>
-                <Muted>
-                  {workout.exercises.length} exercises · {sets} sets ·{' '}
-                  {formatDuration(workout.startedAt, workout.finishedAt)} ·{' '}
-                  {Math.round(workoutVolume(workout))} kg volume
-                </Muted>
-                <Button
-                  label="View details"
-                  variant="secondary"
-                  onPress={() => router.push(`/workout/${workout.id}`)}
-                  style={{ marginTop: 8 }}
-                />
-              </Card>
-            );
-          })
+          <>
+            {recent.map((workout) => {
+              const sets = workout.exercises.reduce(
+                (n, ex) => n + ex.sets.filter((s) => s.completed).length,
+                0
+              );
+              return (
+                <Card key={workout.id} style={{ gap: 6 }}>
+                  <View style={styles.rowBetween}>
+                    <Body style={{ fontWeight: '700', flex: 1 }}>{workout.name}</Body>
+                    <Muted>{formatDate(workout.finishedAt ?? workout.startedAt)}</Muted>
+                  </View>
+                  <Muted>
+                    {workout.exercises.length} exercises · {sets} sets ·{' '}
+                    {formatDuration(workout.startedAt, workout.finishedAt)}
+                  </Muted>
+                  <Button
+                    label="View details"
+                    variant="secondary"
+                    onPress={() => router.push(`/workout/${workout.id}`)}
+                    style={{ marginTop: 8 }}
+                  />
+                </Card>
+              );
+            })}
+            <Pressable
+              onPress={() => router.push('/history')}
+              hitSlop={6}
+              style={{ paddingVertical: 4 }}>
+              <Muted style={{ color: theme.tint, fontWeight: '600' }}>
+                {logged.length > 3
+                  ? 'See all workouts in History'
+                  : 'Open History'}
+              </Muted>
+            </Pressable>
+          </>
         )}
       </ScrollView>
+
+      <Modal
+        visible={!!pendingTemplate}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setPendingTemplate(null)}>
+        <View style={styles.popupBackdrop}>
+          <View
+            style={[
+              styles.popupCard,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}>
+            <Title style={{ fontSize: 22 }}>Start this workout?</Title>
+            <Subtitle>
+              Are you sure you want to start {pendingTemplate?.name}?
+            </Subtitle>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Button
+                label="No"
+                variant="secondary"
+                onPress={() => setPendingTemplate(null)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                label="Yes"
+                onPress={() => {
+                  if (!pendingTemplate) return;
+                  const template = pendingTemplate;
+                  setPendingTemplate(null);
+                  startFromTemplate(template);
+                  router.push('/workout/active');
+                }}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
+  );
+}
+
+function TemplateCard({
+  template,
+  disabled,
+  onStart,
+}: {
+  template: WorkoutTemplate;
+  disabled: boolean;
+  onStart: () => void;
+}) {
+  const theme = useTheme();
+  const preview = template.exercises
+    .slice(0, 3)
+    .map((ex) => ex.exerciseName)
+    .join(' · ');
+  const extra =
+    template.exercises.length > 3 ? ` +${template.exercises.length - 3}` : '';
+
+  return (
+    <View
+      style={[
+        styles.templateRow,
+        {
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+          opacity: disabled ? 0.55 : 1,
+        },
+      ]}>
+      <View style={{ flex: 1, gap: 2, paddingRight: 8 }}>
+        <Body style={{ fontWeight: '700' }}>{template.name}</Body>
+        <Muted numberOfLines={1}>
+          {template.exercises.length} exercise
+          {template.exercises.length === 1 ? '' : 's'}
+          {preview ? ` · ${preview}${extra}` : ''}
+        </Muted>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Start ${template.name}`}
+        disabled={disabled}
+        onPress={onStart}
+        hitSlop={6}
+        style={({ pressed }) => [
+          styles.playButton,
+          {
+            backgroundColor: theme.primary,
+            opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
+          },
+        ]}>
+        <Ionicons
+          name="play"
+          size={18}
+          color={theme.onPrimary}
+          style={{ marginLeft: 2 }}
+        />
+      </Pressable>
+    </View>
   );
 }
 
@@ -220,10 +325,6 @@ const styles = StyleSheet.create({
   header: {
     gap: 6,
     marginTop: 8,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -239,5 +340,32 @@ const styles = StyleSheet.create({
   centered: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  templateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  playButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  popupBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(28,28,28,0.4)',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  popupCard: {
+    borderRadius: 20,
+    padding: 20,
+    gap: 12,
+    borderWidth: StyleSheet.hairlineWidth,
   },
 });

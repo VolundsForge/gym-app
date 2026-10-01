@@ -3,7 +3,7 @@ import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 
 import { HeaderMenuButton } from '@/components/HeaderMenu';
-import Colors from '@/constants/Colors';
+import Colors, { Typeface } from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 
@@ -15,14 +15,25 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme].tint,
         tabBarInactiveTintColor: Colors[colorScheme].tabIconDefault,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+          ...(Platform.OS === 'web' ? { fontFamily: Typeface.web } : null),
+        },
         tabBarStyle: {
-          backgroundColor: Colors[colorScheme].card,
+          backgroundColor: Colors[colorScheme].background,
           borderTopColor: Colors[colorScheme].border,
           height: Platform.OS === 'ios' ? 88 : 64,
           paddingTop: 6,
         },
         headerStyle: {
-          backgroundColor: Colors[colorScheme].card,
+          backgroundColor: Colors[colorScheme].background,
+        },
+        headerShadowVisible: false,
+        headerTitleStyle: {
+          fontWeight: '600',
+          letterSpacing: -0.3,
+          ...(Platform.OS === 'web' ? { fontFamily: Typeface.web } : null),
         },
         headerTintColor: Colors[colorScheme].text,
         headerShown: useClientOnlyValue(false, true),
