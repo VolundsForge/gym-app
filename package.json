@@ -5,12 +5,15 @@
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "expo": "~57.0.21",
-    "expo-constants": "~57.0.8",
+    "expo": "~57.0.26",
+    "expo-blur": "~57.0.3",
+    "expo-constants": "~57.0.20",
+    "expo-dev-client": "~57.0.19",
     "expo-font": "~57.0.1",
-    "expo-linking": "~57.0.9",
+    "expo-linking": "~57.0.11",
     "expo-notifications": "~57.0.21",
     "expo-router": "~57.0.20",
+    "expo-sensors": "~57.0.3",
     "expo-splash-screen": "~57.0.8",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.2",
@@ -29,10 +32,12 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "start": "npx expo start --go",
+    "start:dev": "npx expo start --dev-client",
+    "start:tunnel": "npx expo start --go --tunnel",
+    "android": "npx expo start --android",
+    "ios": "npx expo start --ios",
+    "web": "npx expo start --web"
   },
   "private": true
 }

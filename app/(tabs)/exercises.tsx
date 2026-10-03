@@ -103,7 +103,6 @@ export default function ExercisesScreen() {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View style={{ gap: 12, marginBottom: 8 }}>
-            <Title>Exercises</Title>
             <Subtitle>
               Filter by muscle or equipment — useful on the road when you only have
               bodyweight, or at a gym with machines.

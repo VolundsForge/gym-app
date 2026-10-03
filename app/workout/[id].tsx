@@ -1,10 +1,12 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   Body,
   Button,
   Card,
+  ConfirmDialog,
   EmptyState,
   Muted,
   MuscleTags,
@@ -26,6 +28,8 @@ export default function WorkoutDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getWorkout, deleteWorkout, exercises, activeWorkout, startFromWorkout } =
     useWorkouts();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const workout = id ? getWorkout(id) : undefined;
 
   if (!workout) {
@@ -46,18 +50,16 @@ export default function WorkoutDetailScreen() {
     0
   );
 
-  const onDelete = () => {
-    Alert.alert('Delete workout?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteWorkout(workout.id);
-          router.replace('/history');
-        },
-      },
-    ]);
+  const onDelete = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deleteWorkout(workout.id);
+      setConfirmDelete(false);
+      router.replace('/history');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -131,8 +133,25 @@ export default function WorkoutDetailScreen() {
             router.push('/workout/active');
           }}
         />
-        <Button label="Delete workout" variant="danger" onPress={onDelete} />
+        <Button
+          label="Delete workout"
+          variant="danger"
+          onPress={() => setConfirmDelete(true)}
+        />
       </ScrollView>
+      <ConfirmDialog
+        visible={confirmDelete}
+        title="Delete this workout?"
+        message={`Are you sure you want to delete ${workout.name}? It will be removed from your history.`}
+        confirmLabel="Yes"
+        cancelLabel="No"
+        danger
+        loading={deleting}
+        onCancel={() => {
+          if (!deleting) setConfirmDelete(false);
+        }}
+        onConfirm={() => void onDelete()}
+      />
     </Screen>
   );
 }

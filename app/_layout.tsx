@@ -4,9 +4,11 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-naviga
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { Platform, type TextStyle } from 'react-native';
+import { Platform, View, type TextStyle } from 'react-native';
+import { enableScreens } from 'react-native-screens';
 import 'react-native-reanimated';
 
+import { AmbientBackground } from '@/components/AmbientBackground';
 import { HeaderMenuButton } from '@/components/HeaderMenu';
 import { WorkoutTimerHost } from '@/components/WorkoutTimerHost';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -14,6 +16,8 @@ import { SettingsProvider } from '@/context/SettingsContext';
 import { AppThemeProvider } from '@/context/ThemeContext';
 import { WorkoutProvider } from '@/context/WorkoutContext';
 import Colors, { Typeface } from '@/constants/Colors';
+
+enableScreens(true);
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -65,7 +69,7 @@ function RootLayoutNav() {
     colors: {
       ...(colorScheme === 'dark' ? DarkTheme.colors : DefaultTheme.colors),
       primary: palette.tint,
-      background: palette.background,
+      background: 'transparent',
       card: palette.card,
       text: palette.text,
       border: palette.border,
@@ -75,43 +79,46 @@ function RootLayoutNav() {
   return (
     <ThemeProvider value={navTheme}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-      <Stack
-        screenOptions={{
-          headerRight: () => <HeaderMenuButton />,
-          headerStyle: { backgroundColor: palette.background },
-          headerShadowVisible: false,
-          headerTintColor: palette.text,
-          headerTitleStyle: {
-            fontWeight: '600',
-            letterSpacing: -0.3,
-            color: palette.text,
-            ...(Platform.OS === 'web' ? { fontFamily: Typeface.web } : null),
-          } as TextStyle,
-          contentStyle: { backgroundColor: palette.background },
-        }}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="workout/active"
-          options={{ title: 'Active Workout', headerBackTitle: 'Back' }}
-        />
-        <Stack.Screen
-          name="workout/[id]"
-          options={{ title: 'Workout', headerBackTitle: 'Back' }}
-        />
-        <Stack.Screen
-          name="workout/add-exercise"
-          options={{
-            title: 'Add Exercise',
-            presentation: 'modal',
-            headerBackTitle: 'Close',
-          }}
-        />
-        <Stack.Screen
-          name="exercise/[id]"
-          options={{ title: 'Exercise', headerBackTitle: 'Back' }}
-        />
-        <Stack.Screen name="profile" options={{ title: 'Profile' }} />
-      </Stack>
+      <View style={{ flex: 1, backgroundColor: palette.background }}>
+        <AmbientBackground />
+        <Stack
+          screenOptions={{
+            headerRight: () => <HeaderMenuButton />,
+            headerStyle: { backgroundColor: palette.background },
+            headerShadowVisible: false,
+            headerTintColor: palette.text,
+            headerTitleStyle: {
+              fontWeight: '600',
+              letterSpacing: -0.3,
+              color: palette.text,
+              ...(Platform.OS === 'web' ? { fontFamily: Typeface.web } : null),
+            } as TextStyle,
+            contentStyle: { backgroundColor: 'transparent' },
+          }}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="workout/active"
+            options={{ title: 'Active Workout', headerBackTitle: 'Back' }}
+          />
+          <Stack.Screen
+            name="workout/[id]"
+            options={{ title: 'Workout', headerBackTitle: 'Back' }}
+          />
+          <Stack.Screen
+            name="workout/add-exercise"
+            options={{
+              title: 'Add Exercise',
+              presentation: 'modal',
+              headerBackTitle: 'Close',
+            }}
+          />
+          <Stack.Screen
+            name="exercise/[id]"
+            options={{ title: 'Exercise', headerBackTitle: 'Back' }}
+          />
+          <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+        </Stack>
+      </View>
     </ThemeProvider>
   );
 }

@@ -1,5 +1,6 @@
 import {
   ActivityIndicator,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -23,13 +24,7 @@ export function useTheme() {
 }
 
 export function Screen({ style, ...props }: ViewProps) {
-  const theme = useTheme();
-  return (
-    <View
-      style={[{ flex: 1, backgroundColor: theme.background }, style]}
-      {...props}
-    />
-  );
+  return <View style={[{ flex: 1, backgroundColor: 'transparent' }, style]} {...props} />;
 }
 
 export function Card({ style, ...props }: ViewProps) {
@@ -170,6 +165,82 @@ export function Button({
         </RNText>
       )}
     </Pressable>
+  );
+}
+
+export function ConfirmDialog({
+  visible,
+  title,
+  message,
+  confirmLabel = 'Yes',
+  cancelLabel = 'No',
+  danger = false,
+  loading = false,
+  onConfirm,
+  onCancel,
+}: {
+  visible: boolean;
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  danger?: boolean;
+  loading?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent
+      onRequestClose={() => {
+        if (!loading) onCancel();
+      }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: 'rgba(28,28,28,0.4)',
+          padding: 0,
+          margin: 0,
+        }}>
+        <View
+          style={{
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+            borderRadius: 20,
+            padding: 20,
+            gap: 12,
+            borderWidth: StyleSheet.hairlineWidth,
+            width: '86%',
+            maxWidth: 400,
+            marginLeft: 0,
+            marginRight: 0,
+          }}>
+          <Title style={{ fontSize: 22 }}>{title}</Title>
+          <Subtitle>{message}</Subtitle>
+          <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
+            <Button
+              label={cancelLabel}
+              variant="secondary"
+              disabled={loading}
+              onPress={onCancel}
+              style={{ flex: 1, minWidth: 0 }}
+            />
+            <Button
+              label={confirmLabel}
+              variant={danger ? 'danger' : 'primary'}
+              loading={loading}
+              onPress={onConfirm}
+              style={{ flex: 1, minWidth: 0 }}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 

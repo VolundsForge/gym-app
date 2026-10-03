@@ -2,7 +2,6 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -16,7 +15,6 @@ import {
   Muted,
   Screen,
   Subtitle,
-  Title,
   useTheme,
 } from '@/components/ui';
 import { useWorkouts } from '@/context/WorkoutContext';
@@ -77,7 +75,7 @@ function historyRows(workouts: Workout[]): HistoryRow[] {
 
 export default function HistoryScreen() {
   const theme = useTheme();
-  const { ready, workouts, deleteWorkout, startWorkout, activeWorkout } = useWorkouts();
+  const { ready, workouts, startWorkout, activeWorkout } = useWorkouts();
   const [query, setQuery] = useState('');
 
   const finished = useMemo(() => {
@@ -99,17 +97,6 @@ export default function HistoryScreen() {
     );
   }
 
-  const confirmDelete = (id: string, name: string) => {
-    Alert.alert('Delete workout?', `"${name}" will be removed permanently.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => void deleteWorkout(id),
-      },
-    ]);
-  };
-
   return (
     <Screen>
       <FlatList
@@ -118,7 +105,6 @@ export default function HistoryScreen() {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View style={{ gap: 12, marginBottom: 8 }}>
-            <Title>History</Title>
             <Subtitle>
               Sessions grouped by your calendar — today, yesterday, then each date.
             </Subtitle>
@@ -172,7 +158,6 @@ export default function HistoryScreen() {
           return (
             <Pressable
               onPress={() => router.push(`/workout/${workout.id}`)}
-              onLongPress={() => confirmDelete(workout.id, workout.name)}
               style={({ pressed }) => [
                 styles.card,
                 {

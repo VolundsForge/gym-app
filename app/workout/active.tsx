@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useNavigation } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import {
   Badge,
@@ -36,6 +36,8 @@ export default function ActiveWorkoutScreen() {
   const theme = useTheme();
   const navigation = useNavigation();
   const { timerEnabled } = useSettings();
+  const { width: windowWidth } = useWindowDimensions();
+  const dialogWidth = Math.min(400, Math.max(280, windowWidth - 48));
   const {
     activeWorkout,
     renameActiveWorkout,
@@ -103,7 +105,12 @@ export default function ActiveWorkoutScreen() {
         <View
           style={[
             styles.popupCard,
-            { backgroundColor: theme.card, borderColor: theme.border },
+            {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+              width: dialogWidth,
+              maxWidth: dialogWidth,
+            },
           ]}>
           <Title style={{ fontSize: 22 }}>Delete this workout?</Title>
           <Subtitle>
@@ -274,20 +281,15 @@ export default function ActiveWorkoutScreen() {
 
             {pending ? (
               <Card style={{ gap: 12 }}>
-                <View style={styles.rowBetween}>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Badge label="Now adding" />
-                    <Body style={{ fontWeight: '700', fontSize: 17 }}>
-                      {pending.exerciseName}
-                    </Body>
-                    <Muted>
-                      {pending.muscleGroup}
-                      {pending.equipment ? ` · ${pending.equipment}` : ''}
-                    </Muted>
-                  </View>
-                  <Pressable onPress={() => void cancelPendingExercise()}>
-                    <Muted style={{ color: theme.danger }}>Cancel</Muted>
-                  </Pressable>
+                <View style={{ gap: 4 }}>
+                  <Badge label="Now adding" />
+                  <Body style={{ fontWeight: '700', fontSize: 17 }}>
+                    {pending.exerciseName}
+                  </Body>
+                  <Muted>
+                    {pending.muscleGroup}
+                    {pending.equipment ? ` · ${pending.equipment}` : ''}
+                  </Muted>
                 </View>
                 <Subtitle>
                   Fill in sets and reps
@@ -309,48 +311,51 @@ export default function ActiveWorkoutScreen() {
                   </Muted>
                 ) : null}
                 <Button label="Add to workout" onPress={() => void onAddToWorkout()} />
-              </Card>
-            ) : (
-              <Card style={{ gap: 12 }}>
-                {activeWorkout.exercises.length === 0 ? (
-                  <>
-                    <Body style={{ fontWeight: '700', fontSize: 18 }}>
-                      Add your first exercise
-                    </Body>
-                    <Subtitle>
-                      Pick an exercise, fill in sets, reps, and weight, then add it
-                      to this workout. Repeat for the next one.
-                    </Subtitle>
-                  </>
-                ) : (
-                  <>
-                    <Body style={{ fontWeight: '700', fontSize: 18 }}>
-                      Next exercise
-                    </Body>
-                    <Subtitle>
-                      This one is in the list. Add another exercise the same way.
-                    </Subtitle>
-                  </>
-                )}
                 <Button
-                  label="Add exercise"
-                  onPress={() => router.push('/workout/add-exercise')}
+                  label="Cancel"
+                  variant="ghost"
+                  onPress={() => void cancelPendingExercise()}
                 />
               </Card>
+            ) : (
+              <>
+                <Card style={{ gap: 12 }}>
+                  {activeWorkout.exercises.length === 0 ? (
+                    <>
+                      <Body style={{ fontWeight: '700', fontSize: 18 }}>
+                        Add your first exercise
+                      </Body>
+                      <Subtitle>
+                        Pick an exercise, fill in sets, reps, and weight, then add it
+                        to this workout. Repeat for the next one.
+                      </Subtitle>
+                    </>
+                  ) : (
+                    <>
+                      <Body style={{ fontWeight: '700', fontSize: 18 }}>
+                        Next exercise
+                      </Body>
+                      <Subtitle>
+                        This one is in the list. Add another exercise the same way.
+                      </Subtitle>
+                    </>
+                  )}
+                  <Button
+                    label="Add exercise"
+                    onPress={() => router.push('/workout/add-exercise')}
+                  />
+                </Card>
+                <View style={{ gap: 10, marginTop: 8 }}>
+                  <Button
+                    label="Save workout"
+                    loading={saving}
+                    disabled={activeWorkout.exercises.length === 0}
+                    onPress={() => void onSave()}
+                  />
+                  <Button label="Discard workout" variant="ghost" onPress={onDiscard} />
+                </View>
+              </>
             )}
-
-            <View style={{ gap: 10, marginTop: 8 }}>
-              <Button
-                label="Save workout"
-                loading={saving}
-                disabled={
-                  activeWorkout.exercises.length === 0 &&
-                  !pendingSetsAreReady(pending)
-                }
-                onPress={() => void onSave()}
-              />
-              <Button label="Discard workout" variant="ghost" onPress={onDiscard} />
-            </View>
           </>
         )}
       </ScrollView>
@@ -366,7 +371,12 @@ export default function ActiveWorkoutScreen() {
           <View
             style={[
               styles.popupCard,
-              { backgroundColor: theme.card, borderColor: theme.border },
+              {
+                backgroundColor: theme.card,
+                borderColor: theme.border,
+                width: dialogWidth,
+                maxWidth: dialogWidth,
+              },
             ]}>
             <Title style={{ fontSize: 22 }}>Edit workout</Title>
             <Muted>Workout name</Muted>
@@ -570,15 +580,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   popupBackdrop: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(28,28,28,0.4)',
     justifyContent: 'center',
-    padding: 24,
+    alignItems: 'center',
   },
   popupCard: {
     borderRadius: 20,
     padding: 20,
     gap: 12,
     borderWidth: StyleSheet.hairlineWidth,
+    alignSelf: 'center',
+    marginLeft: 'auto',
+    marginRight: 'auto',
   },
 });

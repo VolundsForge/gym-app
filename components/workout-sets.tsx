@@ -23,26 +23,28 @@ export function SetEditor({
     <View style={{ gap: 10 }}>
       <View style={styles.setHeader}>
         <Muted style={styles.colSet}>SET</Muted>
-        {showWeight ? <Muted style={styles.colNum}>KG</Muted> : null}
-        <Muted style={styles.colNum}>REPS</Muted>
+        <Muted style={[styles.colNum, styles.colLabel]}>REPS</Muted>
+        {showWeight ? <Muted style={[styles.colNum, styles.colLabel]}>KG</Muted> : null}
         <Muted style={styles.colDone}> </Muted>
       </View>
 
       {sets.map((set, index) => (
         <View key={set.id} style={styles.setRow}>
           <Body style={[styles.colSet, { fontWeight: '700' }]}>{index + 1}</Body>
-          {showWeight ? (
+          <View style={styles.colNum}>
             <NumberField
-              value={set.weight}
-              onChange={(weight) => onChangeSet(set.id, { weight })}
-              style={styles.colNum}
+              value={set.reps}
+              onChange={(reps) => onChangeSet(set.id, { reps })}
             />
+          </View>
+          {showWeight ? (
+            <View style={styles.colNum}>
+              <NumberField
+                value={set.weight}
+                onChange={(weight) => onChangeSet(set.id, { weight })}
+              />
+            </View>
           ) : null}
-          <NumberField
-            value={set.reps}
-            onChange={(reps) => onChangeSet(set.id, { reps })}
-            style={styles.colNum}
-          />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Remove set"
@@ -69,11 +71,9 @@ export function SetEditor({
 function NumberField({
   value,
   onChange,
-  style,
 }: {
   value: number;
   onChange: (n: number) => void;
-  style?: object;
 }) {
   const theme = useTheme();
   return (
@@ -89,21 +89,20 @@ function NumberField({
         const n = Number(cleaned);
         if (!Number.isNaN(n)) onChange(n);
       }}
-      style={[
-        {
-          backgroundColor: theme.muted,
-          color: theme.text,
-          borderRadius: Radius.sm,
-          paddingVertical: 8,
-          paddingHorizontal: 8,
-          textAlign: 'center',
-          fontSize: 16,
-          fontWeight: '600',
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: theme.border,
-        },
-        style,
-      ]}
+      style={{
+        width: '100%',
+        minWidth: 0,
+        backgroundColor: theme.muted,
+        color: theme.text,
+        borderRadius: Radius.sm,
+        paddingVertical: 8,
+        paddingHorizontal: 6,
+        textAlign: 'center',
+        fontSize: 16,
+        fontWeight: '600',
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.border,
+      }}
     />
   );
 }
@@ -113,26 +112,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 2,
+    width: '100%',
   },
   setRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    width: '100%',
   },
   colSet: {
-    width: 36,
+    width: 32,
+    flexShrink: 0,
     textAlign: 'center',
   },
   colNum: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+  },
+  colLabel: {
+    textAlign: 'center',
   },
   colDone: {
-    width: 40,
+    width: 36,
+    flexShrink: 0,
   },
   removeSet: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
+    flexShrink: 0,
     borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',

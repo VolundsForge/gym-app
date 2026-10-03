@@ -2,49 +2,67 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 
-import { HeaderMenuButton } from '@/components/HeaderMenu';
+import { HeaderMenuButton, HeaderPageTitle } from '@/components/HeaderMenu';
 import Colors, { Typeface } from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? 'light';
+  const headerShown = useClientOnlyValue(false, true);
+  const palette = Colors[colorScheme];
 
   return (
     <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme].tint,
-        tabBarInactiveTintColor: Colors[colorScheme].tabIconDefault,
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          ...(Platform.OS === 'web' ? { fontFamily: Typeface.web } : null),
-        },
-        tabBarStyle: {
-          backgroundColor: Colors[colorScheme].background,
-          borderTopColor: Colors[colorScheme].border,
-          height: Platform.OS === 'ios' ? 88 : 64,
-          paddingTop: 6,
-        },
-        headerStyle: {
-          backgroundColor: Colors[colorScheme].background,
-        },
-        headerShadowVisible: false,
-        headerTitleStyle: {
-          fontWeight: '600',
-          letterSpacing: -0.3,
-          ...(Platform.OS === 'web' ? { fontFamily: Typeface.web } : null),
-        },
-        headerTintColor: Colors[colorScheme].text,
-        headerShown: useClientOnlyValue(false, true),
-        headerRight: () => <HeaderMenuButton />,
+      detachInactiveScreens
+      screenOptions={({ route, navigation }) => {
+        const state = navigation.getState();
+        const focused = state.routes[state.index]?.key === route.key;
+        return {
+          tabBarActiveTintColor: palette.tint,
+          tabBarInactiveTintColor: palette.tabIconDefault,
+          tabBarLabelStyle: {
+            fontSize: 13,
+            fontWeight: '600',
+            ...(Platform.OS === 'web' ? { fontFamily: Typeface.web } : null),
+          },
+          tabBarIconStyle: {
+            width: 30,
+            height: 30,
+          },
+          tabBarStyle: {
+            backgroundColor: palette.background,
+            borderTopColor: palette.border,
+            height: Platform.OS === 'ios' ? 98 : 74,
+            paddingTop: 8,
+          },
+          sceneStyle: {
+            backgroundColor: 'transparent',
+            display: focused ? 'flex' : 'none',
+            pointerEvents: focused ? 'auto' : 'none',
+          },
+          headerStyle: {
+            backgroundColor: palette.background,
+          },
+          headerShadowVisible: false,
+          headerTitleStyle: {
+            fontWeight: '600',
+            letterSpacing: -0.3,
+            ...(Platform.OS === 'web' ? { fontFamily: Typeface.web } : null),
+          },
+          headerTintColor: palette.text,
+          headerShown,
+          headerTitle: () => null,
+          headerRight: () => <HeaderMenuButton />,
+        };
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+          headerLeft: () => <HeaderPageTitle label="Gym Tracker" />,
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="home" size={28} color={color} />
           ),
         }}
       />
@@ -52,17 +70,9 @@ export default function TabLayout() {
         name="progress"
         options={{
           title: 'Progress',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="trending-up" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: 'History',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time" size={size} color={color} />
+          headerLeft: () => <HeaderPageTitle label="Your growth" />,
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="trending-up" size={28} color={color} />
           ),
         }}
       />
@@ -70,8 +80,19 @@ export default function TabLayout() {
         name="exercises"
         options={{
           title: 'Exercises',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="barbell" size={size} color={color} />
+          headerLeft: () => <HeaderPageTitle label="Exercises" />,
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="barbell" size={28} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'History',
+          headerLeft: () => <HeaderPageTitle label="History" />,
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="time" size={28} color={color} />
           ),
         }}
       />

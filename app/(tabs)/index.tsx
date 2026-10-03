@@ -1,18 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   Badge,
   Body,
   Button,
   Card,
+  ConfirmDialog,
   EmptyState,
   Muted,
   Screen,
   Subtitle,
-  Title,
   useTheme,
 } from '@/components/ui';
 import { Radius } from '@/constants/Colors';
@@ -65,7 +65,6 @@ export default function HomeScreen() {
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Title>Gym Tracker</Title>
           <Subtitle>
             Log sets and reps. Watch your growth. Get a nudge when you’re ready for a
             little more.
@@ -216,43 +215,23 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      <Modal
+      <ConfirmDialog
         visible={!!pendingTemplate}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setPendingTemplate(null)}>
-        <View style={styles.popupBackdrop}>
-          <View
-            style={[
-              styles.popupCard,
-              { backgroundColor: theme.card, borderColor: theme.border },
-            ]}>
-            <Title style={{ fontSize: 22 }}>Start this workout?</Title>
-            <Subtitle>
-              Are you sure you want to start {pendingTemplate?.name}?
-            </Subtitle>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Button
-                label="No"
-                variant="secondary"
-                onPress={() => setPendingTemplate(null)}
-                style={{ flex: 1 }}
-              />
-              <Button
-                label="Yes"
-                onPress={() => {
-                  if (!pendingTemplate) return;
-                  const template = pendingTemplate;
-                  setPendingTemplate(null);
-                  startFromTemplate(template);
-                  router.push('/workout/active');
-                }}
-                style={{ flex: 1 }}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
+        title="Start this workout?"
+        message={
+          pendingTemplate
+            ? `Are you sure you want to start ${pendingTemplate.name}?`
+            : ''
+        }
+        onCancel={() => setPendingTemplate(null)}
+        onConfirm={() => {
+          if (!pendingTemplate) return;
+          const template = pendingTemplate;
+          setPendingTemplate(null);
+          startFromTemplate(template);
+          router.push('/workout/active');
+        }}
+      />
     </Screen>
   );
 }
@@ -355,17 +334,5 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  popupBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(28,28,28,0.4)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  popupCard: {
-    borderRadius: 20,
-    padding: 20,
-    gap: 12,
-    borderWidth: StyleSheet.hairlineWidth,
   },
 });

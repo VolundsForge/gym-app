@@ -8,7 +8,6 @@ import {
   MuscleTags,
   Screen,
   Subtitle,
-  Title,
   useTheme,
 } from '@/components/ui';
 import { useWorkouts } from '@/context/WorkoutContext';
@@ -40,7 +39,6 @@ export default function ProgressScreen() {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View style={{ gap: 8, marginBottom: 12 }}>
-            <Title>Your growth</Title>
             <Subtitle>
               Every logged set builds a trail. Open an exercise to see progress and
               get alternatives if you want a change.

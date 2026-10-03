@@ -8,6 +8,22 @@ import { Body, useTheme } from '@/components/ui';
 import { useSettings } from '@/context/SettingsContext';
 import { useAppTheme } from '@/context/ThemeContext';
 
+export function HeaderPageTitle({ label }: { label: string }) {
+  const theme = useTheme();
+  return (
+    <Body
+      style={{
+        fontWeight: '600',
+        fontSize: 17,
+        letterSpacing: -0.3,
+        color: theme.text,
+        marginLeft: 16,
+      }}>
+      {label}
+    </Body>
+  );
+}
+
 export function HeaderMenuButton() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -22,9 +38,9 @@ export function HeaderMenuButton() {
         accessibilityRole="button"
         accessibilityLabel="Open menu"
         onPress={() => setOpen(true)}
-        hitSlop={8}
+        hitSlop={12}
         style={styles.iconButton}>
-        <Ionicons name="menu" size={26} color={theme.text} />
+        <Ionicons name="menu" size={32} color={theme.text} />
       </Pressable>
 
       <Modal
@@ -100,9 +116,13 @@ export function HeaderMenuButton() {
 
 const styles = StyleSheet.create({
   iconButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginRight: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginRight: 6,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   overlay: {
     flex: 1,
