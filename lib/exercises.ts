@@ -128,6 +128,13 @@ export const DEFAULT_EXERCISES: Exercise[] = [
     muscleGroup: "Shoulders",
     equipment: "Barbell / Dumbbell",
   },
+  {
+    id: "ex_pike_push_up",
+    name: "Pike Push-Up",
+    muscleGroup: "Shoulders",
+    secondaryMuscleGroups: ["Arms", "Core"],
+    equipment: "Bodyweight",
+  },
   // Arms
   {
     id: "ex_bicep_curl",
@@ -164,6 +171,20 @@ export const DEFAULT_EXERCISES: Exercise[] = [
     name: "Overhead Tricep Extension",
     muscleGroup: "Arms",
     equipment: "Barbell / Dumbbell",
+  },
+  {
+    id: "ex_diamond_push_up",
+    name: "Diamond Push-Up",
+    muscleGroup: "Arms",
+    secondaryMuscleGroups: ["Chest", "Shoulders"],
+    equipment: "Bodyweight",
+  },
+  {
+    id: "ex_bench_dip",
+    name: "Bench Dip",
+    muscleGroup: "Arms",
+    secondaryMuscleGroups: ["Shoulders", "Chest"],
+    equipment: "Bodyweight",
   },
   // Legs
   {
@@ -232,6 +253,7 @@ export const DEFAULT_EXERCISES: Exercise[] = [
     muscleGroup: "Core",
     secondaryMuscleGroups: ["Shoulders"],
     equipment: "Bodyweight",
+    timed: true,
   },
   {
     id: "ex_hanging_leg_raise",
@@ -245,6 +267,18 @@ export const DEFAULT_EXERCISES: Exercise[] = [
     name: "Cable Crunch",
     muscleGroup: "Core",
     equipment: "Machine",
+  },
+  {
+    id: "ex_db_russian_twist",
+    name: "Dumbbell Russian Twist",
+    muscleGroup: "Core",
+    equipment: "Barbell / Dumbbell",
+  },
+  {
+    id: "ex_db_side_bend",
+    name: "Dumbbell Side Bend",
+    muscleGroup: "Core",
+    equipment: "Barbell / Dumbbell",
   },
   {
     id: "ex_ab_wheel",
@@ -275,6 +309,27 @@ export const DEFAULT_EXERCISES: Exercise[] = [
     equipment: "Barbell / Dumbbell",
   },
   {
+    id: "ex_burpee",
+    name: "Burpee",
+    muscleGroup: "Full Body",
+    secondaryMuscleGroups: ["Chest", "Legs", "Core"],
+    equipment: "Bodyweight",
+  },
+  {
+    id: "ex_bear_crawl",
+    name: "Bear Crawl",
+    muscleGroup: "Full Body",
+    secondaryMuscleGroups: ["Shoulders", "Core"],
+    equipment: "Bodyweight",
+  },
+  {
+    id: "ex_cable_squat_press",
+    name: "Cable Squat to Press",
+    muscleGroup: "Full Body",
+    secondaryMuscleGroups: ["Legs", "Shoulders", "Core"],
+    equipment: "Machine",
+  },
+  {
     id: "ex_treadmill",
     name: "Treadmill",
     muscleGroup: "Cardio",
@@ -295,6 +350,34 @@ export const DEFAULT_EXERCISES: Exercise[] = [
     secondaryMuscleGroups: ["Back", "Legs", "Arms"],
     equipment: "Machine",
   },
+  {
+    id: "ex_elliptical",
+    name: "Elliptical",
+    muscleGroup: "Cardio",
+    secondaryMuscleGroups: ["Legs"],
+    equipment: "Machine",
+  },
+  {
+    id: "ex_jump_rope",
+    name: "Jump Rope",
+    muscleGroup: "Cardio",
+    secondaryMuscleGroups: ["Legs", "Shoulders"],
+    equipment: "Bodyweight",
+  },
+  {
+    id: "ex_mountain_climbers",
+    name: "Mountain Climbers",
+    muscleGroup: "Cardio",
+    secondaryMuscleGroups: ["Core", "Shoulders"],
+    equipment: "Bodyweight",
+  },
+  {
+    id: "ex_running",
+    name: "Running",
+    muscleGroup: "Cardio",
+    secondaryMuscleGroups: ["Legs"],
+    equipment: "Bodyweight",
+  },
 ];
 
 export const MUSCLE_GROUPS = [
@@ -313,6 +396,20 @@ export const EQUIPMENT_TYPES: Equipment[] = [
   "Barbell / Dumbbell",
   "Bodyweight",
 ];
+
+export function unusedEquipmentForMuscle(
+  exercises: Pick<Exercise, "muscleGroup" | "equipment">[],
+  muscle: MuscleGroup,
+): Equipment[] {
+  return EQUIPMENT_TYPES.filter(
+    (equipment) =>
+      !exercises.some(
+        (exercise) =>
+          exercise.muscleGroup === muscle &&
+          normalizeEquipment(exercise.equipment) === equipment,
+      ),
+  );
+}
 
 /** Muscle groups that can be trained incidentally (not category buckets). */
 export const SECONDARY_MUSCLE_GROUPS: MuscleGroup[] = [
@@ -421,6 +518,7 @@ export function mergeExerciseLibrary(stored: Exercise[]): Exercise[] {
         muscleGroup: def.muscleGroup,
         secondaryMuscleGroups: def.secondaryMuscleGroups,
         equipment: def.equipment,
+        timed: def.timed,
       }),
     );
   }

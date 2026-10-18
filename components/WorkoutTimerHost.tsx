@@ -4,7 +4,7 @@ import { AppState, Platform } from 'react-native';
 import { useSettings } from '@/context/SettingsContext';
 import { useWorkouts } from '@/context/WorkoutContext';
 import { useElapsedClock } from '@/hooks/useElapsedClock';
-import { isEmptyDraftWorkout } from '@/lib/workout-plan';
+import { isEmptyDraftWorkout, isComposingWorkout } from '@/lib/workout-plan';
 import {
   hideWorkoutTimerNotification,
   showWorkoutTimerNotification,
@@ -18,6 +18,7 @@ export function WorkoutTimerHost() {
     onPhone &&
     timerEnabled &&
     !!activeWorkout &&
+    !isComposingWorkout(activeWorkout) &&
     !isEmptyDraftWorkout(activeWorkout);
   const elapsed = useElapsedClock(activeWorkout?.startedAt, running);
   const lastShown = useRef<string>('');

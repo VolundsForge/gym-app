@@ -22,31 +22,45 @@ import {
 } from '@/lib/progress';
 import { computeStats } from '@/lib/stats';
 import {
+  comboKeyFromLoad,
   getAlternativeExercises,
   getProgressiveSuggestions,
   type ProgressiveSuggestion,
 } from '@/lib/suggestions';
+import { useSettings } from '@/context/SettingsContext';
 import {
   loadActiveWorkout,
   loadDismissedSuggestions,
+  loadExerciseNextPlans,
   loadExercises,
+  loadProgressionSnoozes,
   loadTemplates,
   loadWorkouts,
   saveActiveWorkout,
   saveDismissedSuggestions,
+  saveExerciseNextPlans,
   saveExercises,
+  saveProgressionSnoozes,
   saveTemplates,
   saveWorkouts,
 } from '@/lib/storage';
 import {
+  allSetsComplete,
   cloneExercisesForReuse,
+  exercisesWithCompletedSetsOnly,
+  freezeCardioExercise,
+  isTimedExercise,
   isEmptyDraftWorkout,
+  nextGenericWorkoutName,
   pendingSetsAreReady,
+  usesWeight,
 } from '@/lib/workout-plan';
 import type {
   Equipment,
   Exercise,
+  ExerciseNextPlan,
   MuscleGroup,
+  ProgressionSnooze,
   SetEntry,
   Workout,
   WorkoutExercise,
@@ -63,6 +77,7 @@ type WorkoutContextValue = {
   stats: WorkoutStats;
   progressList: ExerciseProgress[];
   progressiveSuggestions: ProgressiveSuggestion[];
+  exerciseNextPlans: ExerciseNextPlan[];
   startWorkout: (name?: string) => Workout;
   startFromTemplate: (template: WorkoutTemplate) => Workout;
   startFromWorkout: (workout: Workout) => Workout;
@@ -94,20 +109,37 @@ type WorkoutContextValue = {
   saveWorkout: () => Promise<boolean>;
   reopenBuilder: () => Promise<void>;
   finishWorkout: () => Promise<Workout | null>;
+  cancelActiveWorkout: () => Promise<Workout | null>;
   discardActiveWorkout: () => Promise<void>;
   deleteWorkout: (id: string) => Promise<void>;
   deleteTemplate: (id: string) => Promise<void>;
+  reorderTemplates: (orderedIds: string[]) => Promise<void>;
   getWorkout: (id: string) => Workout | undefined;
   addCustomExercise: (
     name: string,
     muscleGroup: MuscleGroup,
     secondaryMuscleGroups?: MuscleGroup[],
-    equipment?: Equipment
+    equipment?: Equipment,
+    notes?: string
   ) => Promise<Exercise>;
+  updateExerciseNotes: (workoutExerciseId: string, notes: string) => Promise<void>;
+  startCardioTimer: (workoutExerciseId: string) => Promise<void>;
+  pauseCardioTimer: (workoutExerciseId: string) => Promise<void>;
+  resetCardioTimer: (workoutExerciseId: string) => Promise<void>;
+  setCardioComplete: (
+    workoutExerciseId: string,
+    completed: boolean
+  ) => Promise<void>;
   deleteCustomExercise: (id: string) => Promise<void>;
   getProgressFor: (exerciseId: string) => ExerciseProgress | undefined;
   getAlternatives: (exerciseId: string) => Exercise[];
   dismissSuggestion: (suggestionId: string) => Promise<void>;
+  suggestionsForWorkout: (workout: Workout) => ProgressiveSuggestion[];
+  applyExerciseNextPlans: (plans: ExerciseNextPlan[]) => Promise<void>;
+  delayGrowthTips: (
+    suggestions: ProgressiveSuggestion[],
+    extraSessions: number
+  ) => Promise<void>;
 };
 
 const WorkoutContext = createContext<WorkoutContextValue | null>(null);
@@ -121,27 +153,36 @@ function emptySet(seed?: { reps?: number; weight?: number }): SetEntry {
   };
 }
 
-function defaultWorkoutName(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Morning Workout';
-  if (hour < 17) return 'Afternoon Workout';
-  return 'Evening Workout';
-}
+
 
 export function WorkoutProvider({ children }: { children: React.ReactNode }) {
+  const { weightUnit, progressionNudgesEnabled, progressionSessionThreshold } =
+    useSettings();
   const [ready, setReady] = useState(false);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>(DEFAULT_EXERCISES);
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
   const [dismissedSuggestions, setDismissedSuggestions] = useState<string[]>([]);
+  const [progressionSnoozes, setProgressionSnoozes] = useState<ProgressionSnooze[]>(
+    []
+  );
+  const [exerciseNextPlans, setExerciseNextPlans] = useState<ExerciseNextPlan[]>(
+    []
+  );
   const desiredActiveRef = useRef<Workout | null>(null);
   const activeSaveChain = useRef(Promise.resolve());
   const discardedRef = useRef(false);
   const workoutsRef = useRef(workouts);
   const exercisesRef = useRef(exercises);
+  const dismissedRef = useRef(dismissedSuggestions);
+  const snoozesRef = useRef(progressionSnoozes);
+  const nextPlansRef = useRef(exerciseNextPlans);
   workoutsRef.current = workouts;
   exercisesRef.current = exercises;
+  dismissedRef.current = dismissedSuggestions;
+  snoozesRef.current = progressionSnoozes;
+  nextPlansRef.current = exerciseNextPlans;
 
   useEffect(() => {
     let cancelled = false;
@@ -153,12 +194,16 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         storedActive,
         storedDismissed,
         storedTemplates,
+        storedSnoozes,
+        storedPlans,
       ] = await Promise.all([
         loadWorkouts(),
         loadExercises(),
         loadActiveWorkout(),
         loadDismissedSuggestions(),
         loadTemplates(),
+        loadProgressionSnoozes(),
+        loadExerciseNextPlans(),
       ]);
 
       if (cancelled) return;
@@ -182,6 +227,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       desiredActiveRef.current = restored;
       setActiveWorkout(restored);
       setDismissedSuggestions(storedDismissed);
+      setProgressionSnoozes(storedSnoozes);
+      setExerciseNextPlans(storedPlans);
       setReady(true);
     })();
 
@@ -231,6 +278,17 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   );
 
   const seededSets = useCallback((exerciseId: string): SetEntry[] => {
+    const catalog = exercisesRef.current.find((item) => item.id === exerciseId);
+    const logsWeight = usesWeight(catalog?.equipment, catalog?.muscleGroup);
+    const plan = nextPlansRef.current.find((item) => item.exerciseId === exerciseId);
+    if (plan) {
+      const count = Math.max(1, Math.round(plan.sets));
+      const seed = {
+        reps: Math.max(1, Math.round(plan.reps)),
+        weight: logsWeight ? plan.weight : 0,
+      };
+      return Array.from({ length: count }, () => emptySet(seed));
+    }
     const progress = getExerciseProgress(
       workoutsRef.current,
       exercisesRef.current,
@@ -239,25 +297,45 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     const last = progress?.sessions[progress.sessions.length - 1];
     const seed = {
       reps: last ? Math.round(last.avgReps) : 8,
-      weight: last ? Math.round(last.avgWeight * 2) / 2 : 0,
+      weight: logsWeight && last ? Math.round(last.avgWeight * 2) / 2 : 0,
     };
     return [emptySet(seed), emptySet(seed), emptySet(seed)];
   }, []);
 
   const toWorkoutExercise = useCallback(
-    (exercise: Exercise, sets?: SetEntry[]): WorkoutExercise => ({
-      id: createId('wex'),
-      exerciseId: exercise.id,
-      exerciseName: exercise.name,
-      muscleGroup: exercise.muscleGroup,
-      secondaryMuscleGroups: normalizeSecondaryMuscleGroups(
-        exercise.muscleGroup,
-        exercise.secondaryMuscleGroups
-      ),
-      equipment: normalizeEquipment(exercise.equipment),
-      sets: sets ?? seededSets(exercise.id),
-    }),
+    (exercise: Exercise, sets?: SetEntry[]): WorkoutExercise => {
+      const timed = isTimedExercise(exercise);
+      return {
+        id: createId('wex'),
+        exerciseId: exercise.id,
+        exerciseName: exercise.name,
+        muscleGroup: exercise.muscleGroup,
+        secondaryMuscleGroups: normalizeSecondaryMuscleGroups(
+          exercise.muscleGroup,
+          exercise.secondaryMuscleGroups
+        ),
+        equipment: normalizeEquipment(exercise.equipment),
+        sets: timed ? [] : (sets ?? seededSets(exercise.id)),
+        notes: exercise.notes,
+        timed: timed || undefined,
+        durationSeconds: timed ? 0 : undefined,
+        completed: timed ? false : undefined,
+      };
+    },
     [seededSets]
+  );
+
+  const unusedWorkoutName = useCallback(
+    (preferred?: string) => {
+      const trimmed = preferred?.trim();
+      if (trimmed) return trimmed;
+      return nextGenericWorkoutName([
+        ...workoutsRef.current.map((item) => item.name),
+        ...templates.map((item) => item.name),
+        desiredActiveRef.current?.name ?? '',
+      ]);
+    },
+    [templates]
   );
 
   const startWorkout = useCallback(
@@ -265,10 +343,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       discardedRef.current = false;
       const workout: Workout = {
         id: createId('workout'),
-        name: name?.trim() || defaultWorkoutName(),
+        name: name?.trim() ?? '',
         startedAt: new Date().toISOString(),
         exercises: [],
         phase: 'building',
+        purpose: 'compose',
         pendingExercise: null,
       };
       void persistActive(workout);
@@ -284,8 +363,16 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         id: createId('workout'),
         name,
         startedAt: new Date().toISOString(),
-        exercises: cloneExercisesForReuse(sourceExercises),
+        exercises: cloneExercisesForReuse(sourceExercises).map((ex) => {
+          const catalog = exercisesRef.current.find((item) => item.id === ex.exerciseId);
+          return {
+            ...ex,
+            equipment: catalog?.equipment ?? ex.equipment,
+            timed: catalog?.timed ?? ex.timed,
+          };
+        }),
         phase: 'review',
+        purpose: 'session',
         pendingExercise: null,
       };
       void persistActive(workout);
@@ -533,6 +620,67 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     [mapActiveExercise]
   );
 
+  const updateExerciseNotes = useCallback(
+    async (workoutExerciseId: string, notes: string) => {
+      await mapActiveExercise(workoutExerciseId, (ex) => ({
+        ...ex,
+        notes: notes.trim() ? notes : undefined,
+      }));
+    },
+    [mapActiveExercise]
+  );
+
+  const startCardioTimer = useCallback(
+    async (workoutExerciseId: string) => {
+      await mapActiveExercise(workoutExerciseId, (ex) => {
+        if (!isTimedExercise(ex) || ex.timerStartedAt) return ex;
+        return {
+          ...ex,
+          completed: false,
+          timerStartedAt: new Date().toISOString(),
+        };
+      });
+    },
+    [mapActiveExercise]
+  );
+
+  const pauseCardioTimer = useCallback(
+    async (workoutExerciseId: string) => {
+      await mapActiveExercise(workoutExerciseId, (ex) =>
+        isTimedExercise(ex) ? freezeCardioExercise(ex) : ex
+      );
+    },
+    [mapActiveExercise]
+  );
+
+  const resetCardioTimer = useCallback(
+    async (workoutExerciseId: string) => {
+      await mapActiveExercise(workoutExerciseId, (ex) => {
+        if (!isTimedExercise(ex)) return ex;
+        return {
+          ...ex,
+          durationSeconds: 0,
+          timerStartedAt: undefined,
+          completed: false,
+        };
+      });
+    },
+    [mapActiveExercise]
+  );
+
+  const setCardioComplete = useCallback(
+    async (workoutExerciseId: string, completed: boolean) => {
+      await mapActiveExercise(workoutExerciseId, (ex) => {
+        if (!isTimedExercise(ex)) return ex;
+        return {
+          ...freezeCardioExercise(ex),
+          completed,
+        };
+      });
+    },
+    [mapActiveExercise]
+  );
+
   const removeExerciseFromActive = useCallback(
     async (workoutExerciseId: string) => {
       await patchActive((current) => ({
@@ -549,7 +697,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   const upsertTemplateFromWorkout = useCallback(
     async (workout: Workout) => {
-      const name = workout.name.trim() || defaultWorkoutName();
+      const name = unusedWorkoutName(workout.name);
       const now = new Date().toISOString();
       const cloned = cloneExercisesForReuse(workout.exercises);
       const existing = templates.find(
@@ -576,7 +724,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       };
       await persistTemplates([created, ...templates]);
     },
-    [templates, persistTemplates]
+    [templates, persistTemplates, unusedWorkoutName]
   );
 
   const saveWorkout = useCallback(async () => {
@@ -593,6 +741,17 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     }
     if (exercisesList.length === 0) return false;
 
+    if (current.purpose === 'compose') {
+      await upsertTemplateFromWorkout({
+        ...current,
+        name: unusedWorkoutName(current.name),
+        exercises: exercisesList,
+        pendingExercise: null,
+      });
+      await persistActive(null);
+      return true;
+    }
+
     await persistActive({
       ...current,
       exercises: exercisesList,
@@ -600,7 +759,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       phase: 'review',
     });
     return true;
-  }, [persistActive]);
+  }, [persistActive, unusedWorkoutName, upsertTemplateFromWorkout]);
 
   const reopenBuilder = useCallback(async () => {
     await patchActive((current) => ({
@@ -613,20 +772,34 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     const current = desiredActiveRef.current;
     if (!current || current.exercises.length === 0) return null;
 
+    const completedExercises = exercisesWithCompletedSetsOnly(current.exercises);
+    if (completedExercises.length === 0) {
+      await persistActive(null);
+      return null;
+    }
+
+    const fullyDone = current.exercises.every(allSetsComplete);
     const finished: Workout = {
       id: current.id,
       name: current.name,
       startedAt: current.startedAt,
       finishedAt: new Date().toISOString(),
-      exercises: current.exercises.map((ex) => ({
-        ...ex,
-        sets: ex.sets.filter((s) => s.reps > 0),
-      })),
+      exercises: completedExercises,
     };
 
     const next = [finished, ...workouts.filter((w) => w.id !== finished.id)];
     await persistWorkouts(next);
-    await upsertTemplateFromWorkout(finished);
+    if (fullyDone) {
+      await upsertTemplateFromWorkout(finished);
+    }
+    const doneIds = new Set(completedExercises.map((ex) => ex.exerciseId));
+    const remainingPlans = nextPlansRef.current.filter(
+      (plan) => !doneIds.has(plan.exerciseId)
+    );
+    if (remainingPlans.length !== nextPlansRef.current.length) {
+      setExerciseNextPlans(remainingPlans);
+      await saveExerciseNextPlans(remainingPlans);
+    }
     await persistActive(null);
     return finished;
   }, [workouts, persistWorkouts, persistActive, upsertTemplateFromWorkout]);
@@ -634,6 +807,35 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const discardActiveWorkout = useCallback(async () => {
     await persistActive(null);
   }, [persistActive]);
+
+  const cancelActiveWorkout = useCallback(async () => {
+    const current = desiredActiveRef.current;
+    if (!current) return null;
+
+    if (current.purpose === 'compose') {
+      await persistActive(null);
+      return null;
+    }
+
+    const completedExercises = exercisesWithCompletedSetsOnly(current.exercises);
+    if (completedExercises.length === 0) {
+      await persistActive(null);
+      return null;
+    }
+
+    const finished: Workout = {
+      id: current.id,
+      name: current.name,
+      startedAt: current.startedAt,
+      finishedAt: new Date().toISOString(),
+      exercises: completedExercises,
+    };
+
+    const next = [finished, ...workouts.filter((w) => w.id !== finished.id)];
+    await persistWorkouts(next);
+    await persistActive(null);
+    return finished;
+  }, [workouts, persistWorkouts, persistActive]);
 
   const deleteWorkout = useCallback(
     async (id: string) => {
@@ -645,6 +847,22 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const deleteTemplate = useCallback(
     async (id: string) => {
       await persistTemplates(templates.filter((t) => t.id !== id));
+    },
+    [templates, persistTemplates]
+  );
+
+  const reorderTemplates = useCallback(
+    async (orderedIds: string[]) => {
+      const byId = new Map(templates.map((item) => [item.id, item]));
+      const next: WorkoutTemplate[] = [];
+      for (const id of orderedIds) {
+        const item = byId.get(id);
+        if (!item) continue;
+        next.push(item);
+        byId.delete(id);
+      }
+      for (const rest of byId.values()) next.push(rest);
+      await persistTemplates(next);
     },
     [templates, persistTemplates]
   );
@@ -662,8 +880,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       name: string,
       muscleGroup: MuscleGroup,
       secondaryMuscleGroups?: MuscleGroup[],
-      equipment?: Equipment
+      equipment?: Equipment,
+      notes?: string
     ) => {
+      const trimmedNotes = notes?.trim();
       const exercise: Exercise = {
         id: createId('ex'),
         name: name.trim(),
@@ -673,6 +893,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           secondaryMuscleGroups
         ),
         equipment: normalizeEquipment(equipment),
+        notes: trimmedNotes ? trimmedNotes : undefined,
         isCustom: true,
       };
       await persistExercises([exercise, ...exercises]);
@@ -694,8 +915,21 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   );
 
   const progressiveSuggestions = useMemo(
-    () => getProgressiveSuggestions(workouts, exercises, dismissedSuggestions),
-    [workouts, exercises, dismissedSuggestions]
+    () =>
+      getProgressiveSuggestions(workouts, exercises, dismissedSuggestions, weightUnit, {
+        enabled: progressionNudgesEnabled,
+        threshold: progressionSessionThreshold,
+        snoozes: progressionSnoozes,
+      }),
+    [
+      workouts,
+      exercises,
+      dismissedSuggestions,
+      weightUnit,
+      progressionNudgesEnabled,
+      progressionSessionThreshold,
+      progressionSnoozes,
+    ]
   );
 
   const getProgressFor = useCallback(
@@ -717,6 +951,123 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     [dismissedSuggestions]
   );
 
+  const suggestionsForWorkout = useCallback(
+    (workout: Workout) => {
+      if (!progressionNudgesEnabled) return [];
+      const merged = [
+        workout,
+        ...workoutsRef.current.filter((item) => item.id !== workout.id),
+      ];
+      const ids = new Set(workout.exercises.map((ex) => ex.exerciseId));
+      return getProgressiveSuggestions(
+        merged,
+        exercisesRef.current,
+        dismissedRef.current,
+        weightUnit,
+        {
+          enabled: true,
+          threshold: progressionSessionThreshold,
+          snoozes: snoozesRef.current,
+        }
+      ).filter((tip) => ids.has(tip.exerciseId));
+    },
+    [progressionNudgesEnabled, progressionSessionThreshold, weightUnit]
+  );
+
+  const applyExerciseNextPlans = useCallback(
+    async (plans: ExerciseNextPlan[]) => {
+      const byId = new Map(plans.map((plan) => [plan.exerciseId, plan]));
+      const merged = [
+        ...exerciseNextPlans.filter((plan) => !byId.has(plan.exerciseId)),
+        ...plans,
+      ];
+      setExerciseNextPlans(merged);
+      await saveExerciseNextPlans(merged);
+
+      const touched = new Set(plans.map((plan) => plan.exerciseId));
+      const nextTemplates = templates.map((template) => {
+        let changed = false;
+        const exercisesList = template.exercises.map((ex) => {
+          const plan = byId.get(ex.exerciseId);
+          if (!plan || isTimedExercise(ex)) return ex;
+          changed = true;
+          const count = Math.max(1, Math.round(plan.sets));
+          const seed = {
+            reps: Math.max(1, Math.round(plan.reps)),
+            weight: plan.weight,
+          };
+          return {
+            ...ex,
+            sets: Array.from({ length: count }, () => emptySet(seed)),
+          };
+        });
+        if (!changed) return template;
+        return {
+          ...template,
+          exercises: exercisesList,
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      if (nextTemplates.some((template, index) => template !== templates[index])) {
+        await persistTemplates(nextTemplates);
+      }
+
+      const nextDismissed = [
+        ...new Set([
+          ...dismissedSuggestions,
+          ...progressiveSuggestions
+            .filter((tip) => touched.has(tip.exerciseId))
+            .map((tip) => tip.id),
+        ]),
+      ];
+      setDismissedSuggestions(nextDismissed);
+      await saveDismissedSuggestions(nextDismissed);
+
+      const nextSnoozes = progressionSnoozes.filter(
+        (item) => !touched.has(item.exerciseId)
+      );
+      if (nextSnoozes.length !== progressionSnoozes.length) {
+        setProgressionSnoozes(nextSnoozes);
+        await saveProgressionSnoozes(nextSnoozes);
+      }
+    },
+    [
+      exerciseNextPlans,
+      templates,
+      persistTemplates,
+      dismissedSuggestions,
+      progressiveSuggestions,
+      progressionSnoozes,
+    ]
+  );
+
+  const delayGrowthTips = useCallback(
+    async (suggestions: ProgressiveSuggestion[], extraSessions: number) => {
+      const extra = Math.max(1, Math.round(extraSessions));
+      const byExercise = new Map(
+        suggestions.map((tip) => [
+          tip.exerciseId,
+          {
+            exerciseId: tip.exerciseId,
+            comboKey: comboKeyFromLoad(
+              tip.baseline.sets,
+              tip.baseline.reps,
+              tip.baseline.weight
+            ),
+            minStreak: tip.sessionCount + extra,
+          } satisfies ProgressionSnooze,
+        ])
+      );
+      const next = [
+        ...progressionSnoozes.filter((item) => !byExercise.has(item.exerciseId)),
+        ...byExercise.values(),
+      ];
+      setProgressionSnoozes(next);
+      await saveProgressionSnoozes(next);
+    },
+    [progressionSnoozes]
+  );
+
   const stats = useMemo(() => computeStats(workouts), [workouts]);
 
   const value = useMemo<WorkoutContextValue>(
@@ -729,6 +1080,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       stats,
       progressList,
       progressiveSuggestions,
+      exerciseNextPlans,
       startWorkout,
       startFromTemplate,
       startFromWorkout,
@@ -750,15 +1102,25 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       saveWorkout,
       reopenBuilder,
       finishWorkout,
+      cancelActiveWorkout,
       discardActiveWorkout,
       deleteWorkout,
       deleteTemplate,
+      reorderTemplates,
       getWorkout,
       addCustomExercise,
+      updateExerciseNotes,
+      startCardioTimer,
+      pauseCardioTimer,
+      resetCardioTimer,
+      setCardioComplete,
       deleteCustomExercise,
       getProgressFor,
       getAlternatives,
       dismissSuggestion,
+      suggestionsForWorkout,
+      applyExerciseNextPlans,
+      delayGrowthTips,
     }),
     [
       ready,
@@ -769,6 +1131,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       stats,
       progressList,
       progressiveSuggestions,
+      exerciseNextPlans,
       startWorkout,
       startFromTemplate,
       startFromWorkout,
@@ -790,15 +1153,25 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       saveWorkout,
       reopenBuilder,
       finishWorkout,
+      cancelActiveWorkout,
       discardActiveWorkout,
       deleteWorkout,
       deleteTemplate,
+      reorderTemplates,
       getWorkout,
       addCustomExercise,
+      updateExerciseNotes,
+      startCardioTimer,
+      pauseCardioTimer,
+      resetCardioTimer,
+      setCardioComplete,
       deleteCustomExercise,
       getProgressFor,
       getAlternatives,
       dismissSuggestion,
+      suggestionsForWorkout,
+      applyExerciseNextPlans,
+      delayGrowthTips,
     ]
   );
 

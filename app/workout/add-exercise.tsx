@@ -26,6 +26,7 @@ import {
   MUSCLE_GROUPS,
   exerciseListRows,
   normalizeEquipment,
+  unusedEquipmentForMuscle,
 } from '@/lib/exercises';
 import type { Equipment, Exercise, MuscleGroup } from '@/types/workout';
 
@@ -85,7 +86,11 @@ export default function AddExerciseScreen() {
       return;
     }
     const equipment =
-      equipmentFilter === 'All' ? 'Barbell / Dumbbell' : equipmentFilter;
+      equipmentFilter === 'All'
+        ? filter === 'Cardio'
+          ? 'Machine'
+          : 'Barbell / Dumbbell'
+        : equipmentFilter;
     const exercise = await addCustomExercise(name, filter, undefined, equipment);
     await beginPendingExercise(exercise);
     router.back();
@@ -101,8 +106,8 @@ export default function AddExerciseScreen() {
         ListHeaderComponent={
           <View style={{ gap: 12, marginBottom: 8 }}>
             <Subtitle>
-              Pick one exercise. You’ll fill sets, reps, and weight on the next
-              screen, then add it to the workout.
+              Pick one exercise. Next you’ll log sets, reps, and weight, or time
+              cardio on the machine.
             </Subtitle>
             <Input
               value={query}
@@ -122,6 +127,7 @@ export default function AddExerciseScreen() {
               options={['All', ...EQUIPMENT_TYPES] as const}
               value={equipmentFilter}
               onChange={setEquipmentFilter}
+              inactiveOptions={unusedEquipmentForMuscle(exercises, filter)}
             />
             {query.trim() ? (
               <Button
@@ -162,6 +168,11 @@ export default function AddExerciseScreen() {
               {!added ? (
                 <Muted style={{ marginTop: 6 }}>
                   {exercise.muscleGroup} · {normalizeEquipment(exercise.equipment)}
+                </Muted>
+              ) : null}
+              {!added && exercise.notes ? (
+                <Muted numberOfLines={2} style={{ marginTop: 4 }}>
+                  {exercise.notes}
                 </Muted>
               ) : null}
             </Pressable>

@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HeaderMenuButton, HeaderPageTitle } from '@/components/HeaderMenu';
 import Colors, { Typeface } from '@/constants/Colors';
@@ -11,6 +12,8 @@ export default function TabLayout() {
   const colorScheme = useColorScheme() ?? 'light';
   const headerShown = useClientOnlyValue(false, true);
   const palette = Colors[colorScheme];
+  const insets = useSafeAreaInsets();
+  const tabBarBody = Platform.OS === 'ios' ? 64 : 74;
 
   return (
     <Tabs
@@ -33,8 +36,9 @@ export default function TabLayout() {
           tabBarStyle: {
             backgroundColor: palette.background,
             borderTopColor: palette.border,
-            height: Platform.OS === 'ios' ? 98 : 74,
+            height: tabBarBody + insets.bottom,
             paddingTop: 8,
+            paddingBottom: insets.bottom,
           },
           sceneStyle: {
             backgroundColor: 'transparent',

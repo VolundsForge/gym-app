@@ -23,11 +23,14 @@ import {
   calendarDayKey,
   calendarMonthKey,
   formatDayHeading,
-  formatDuration,
   formatMonthHeading,
   formatTime,
 } from '@/lib/stats';
-import { isLoggedWorkout } from '@/lib/workout-plan';
+import {
+  formatWorkoutListMeta,
+  isComposingWorkout,
+  isLoggedWorkout,
+} from '@/lib/workout-plan';
 import type { Workout } from '@/types/workout';
 
 type HistoryRow =
@@ -75,7 +78,7 @@ function historyRows(workouts: Workout[]): HistoryRow[] {
 
 export default function HistoryScreen() {
   const theme = useTheme();
-  const { ready, workouts, startWorkout, activeWorkout } = useWorkouts();
+  const { ready, workouts, activeWorkout } = useWorkouts();
   const [query, setQuery] = useState('');
 
   const finished = useMemo(() => {
@@ -125,13 +128,21 @@ export default function HistoryScreen() {
                 ? 'Try a different search term.'
                 : 'Finish a workout and it will appear in your history.'
             }
-            actionLabel={query ? undefined : activeWorkout ? 'Continue workout' : 'Start workout'}
+            actionLabel={
+              query
+                ? undefined
+                : activeWorkout
+                  ? isComposingWorkout(activeWorkout)
+                    ? 'Continue creating'
+                    : 'Continue workout'
+                  : 'Go to Home'
+            }
             onAction={
               query
                 ? undefined
                 : () => {
-                    if (!activeWorkout) startWorkout();
-                    router.push('/workout/active');
+                    if (activeWorkout) router.push('/workout/active');
+                    else router.replace('/');
                   }
             }
           />
@@ -151,10 +162,6 @@ export default function HistoryScreen() {
           }
 
           const workout = item.workout;
-          const sets = workout.exercises.reduce(
-            (n, ex) => n + ex.sets.filter((s) => s.completed).length,
-            0
-          );
           return (
             <Pressable
               onPress={() => router.push(`/workout/${workout.id}`)}
@@ -171,8 +178,7 @@ export default function HistoryScreen() {
                 <Muted>{formatTime(workout.finishedAt ?? workout.startedAt)}</Muted>
               </View>
               <Muted style={{ marginTop: 6 }}>
-                {workout.exercises.length} exercises · {sets} sets ·{' '}
-                {formatDuration(workout.startedAt, workout.finishedAt)}
+                {formatWorkoutListMeta(workout)}
               </Muted>
               <Muted style={{ marginTop: 8 }}>
                 {workout.exercises

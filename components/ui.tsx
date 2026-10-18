@@ -8,9 +8,11 @@ import {
   Text as RNText,
   TextInput,
   View,
+  type StyleProp,
   type TextInputProps,
   type TextProps,
   type ViewProps,
+  type ViewStyle,
 } from 'react-native';
 
 import Colors, { Radius, Typeface } from '@/constants/Colors';
@@ -313,10 +315,12 @@ export function Chip({
   label,
   selected,
   onPress,
+  inactive = false,
 }: {
   label: string;
   selected: boolean;
   onPress: () => void;
+  inactive?: boolean;
 }) {
   const theme = useTheme();
   return (
@@ -329,12 +333,14 @@ export function Chip({
         borderRadius: Radius.pill,
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: selected ? theme.tint : theme.border,
+        opacity: inactive && !selected ? 0.55 : 1,
       }}>
       <Body
         style={{
-          color: selected ? theme.onTint : theme.text,
+          color: selected ? theme.onTint : inactive ? theme.textSecondary : theme.text,
           fontSize: 13,
           fontWeight: '600',
+          textDecorationLine: inactive ? 'line-through' : 'none',
         }}>
         {label}
       </Body>
@@ -346,11 +352,14 @@ export function FilterChips<T extends string>({
   options,
   value,
   onChange,
+  inactiveOptions,
 }: {
   options: readonly T[];
   value: T;
   onChange: (next: T) => void;
+  inactiveOptions?: readonly T[];
 }) {
+  const inactive = new Set(inactiveOptions);
   return (
     <ScrollView
       horizontal
@@ -362,6 +371,7 @@ export function FilterChips<T extends string>({
           key={item}
           label={item}
           selected={value === item}
+          inactive={inactive.has(item)}
           onPress={() => onChange(item)}
         />
       ))}
@@ -372,22 +382,28 @@ export function FilterChips<T extends string>({
 export function Badge({
   label,
   tone = 'primary',
+  style,
 }: {
   label: string;
   tone?: 'primary' | 'secondary';
+  style?: StyleProp<ViewStyle>;
 }) {
   const theme = useTheme();
   return (
     <View
-      style={{
-        backgroundColor: tone === 'primary' ? theme.tintMuted : theme.muted,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: Radius.pill,
-        alignSelf: 'flex-start',
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: tone === 'primary' ? theme.tint : theme.border,
-      }}>
+      style={[
+        {
+          backgroundColor: tone === 'primary' ? theme.tintMuted : theme.muted,
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: Radius.pill,
+          alignSelf: 'flex-start',
+          maxWidth: '100%',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: tone === 'primary' ? theme.tint : theme.border,
+        },
+        style,
+      ]}>
       <Muted
         style={{
           fontWeight: '600',
@@ -402,10 +418,12 @@ export function Badge({
 export function MuscleTags({
   primary,
   secondary,
+  equipment,
   layout = 'row',
 }: {
   primary: string;
   secondary?: string[];
+  equipment?: string;
   layout?: 'row' | 'stacked' | 'compact';
 }) {
   const extras = (secondary ?? []).filter((group) => group && group !== primary);
@@ -421,21 +439,43 @@ export function MuscleTags({
 
   if (layout === 'stacked') {
     return (
-      <View style={{ gap: 8 }}>
-        <View style={{ gap: 4 }}>
-          <Muted>Primary</Muted>
-          <Badge label={primary} />
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          gap: 12,
+        }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 4, alignItems: 'center' }}>
+          <Muted style={{ textAlign: 'center' }}>Primary</Muted>
+          <Badge label={primary} style={{ alignSelf: 'center' }} />
         </View>
-        {extras.length > 0 ? (
-          <View style={{ gap: 4 }}>
-            <Muted>Also trained</Muted>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 4, alignItems: 'center' }}>
+          <Muted style={{ textAlign: 'center' }}>Secondary</Muted>
+          {extras.length > 0 ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 6,
+                justifyContent: 'center',
+                alignSelf: 'stretch',
+              }}>
               {extras.map((group) => (
                 <Badge key={group} label={group} tone="secondary" />
               ))}
             </View>
-          </View>
-        ) : null}
+          ) : (
+            <Muted>—</Muted>
+          )}
+        </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 4, alignItems: 'center' }}>
+          <Muted style={{ textAlign: 'center' }}>Equipment</Muted>
+          {equipment ? (
+            <Badge label={equipment} tone="secondary" style={{ alignSelf: 'center' }} />
+          ) : (
+            <Muted>—</Muted>
+          )}
+        </View>
       </View>
     );
   }

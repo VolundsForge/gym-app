@@ -1,13 +1,55 @@
-import type { Exercise, MuscleGroup, Workout } from '@/types/workout';
+import type {
+  Exercise,
+  MuscleGroup,
+  ProgressionSnooze,
+  Workout,
+} from '@/types/workout';
 import {
   buildExerciseProgressMap,
   type ExerciseProgress,
   type ExerciseSessionSnapshot,
 } from '@/lib/progress';
+import { formatWeight, type WeightUnit } from '@/lib/weight';
 
-/** ~10 logged sessions of the same exercise within ~3 months. */
+/** Default repeats of the same sets / reps / weight combo before a nudge. */
 export const PROGRESSION_SESSION_THRESHOLD = 10;
+export const PROGRESSION_THRESHOLD_MIN = 2;
+export const PROGRESSION_THRESHOLD_MAX = 20;
 export const PROGRESSION_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
+
+export function clampProgressionThreshold(value: number): number {
+  if (!Number.isFinite(value)) return PROGRESSION_SESSION_THRESHOLD;
+  return Math.min(
+    PROGRESSION_THRESHOLD_MAX,
+    Math.max(PROGRESSION_THRESHOLD_MIN, Math.round(value))
+  );
+}
+
+export function comboKeyFromLoad(
+  sets: number,
+  reps: number,
+  weightKg: number
+): string {
+  return `${Math.max(1, Math.round(sets))}x${Math.max(1, Math.round(reps))}@${roundWeight(weightKg)}`;
+}
+
+function comboKey(session: ExerciseSessionSnapshot): string {
+  return comboKeyFromLoad(session.totalSets, session.avgReps, session.avgWeight);
+}
+
+/** Trailing streak of the same sets / reps / weight combo (oldest → newest). */
+export function trailingComboStreak(
+  sessions: ExerciseSessionSnapshot[]
+): ExerciseSessionSnapshot[] {
+  if (sessions.length === 0) return [];
+  const key = comboKey(sessions[sessions.length - 1]);
+  const streak: ExerciseSessionSnapshot[] = [];
+  for (let i = sessions.length - 1; i >= 0; i -= 1) {
+    if (comboKey(sessions[i]) !== key) break;
+    streak.push(sessions[i]);
+  }
+  return streak.reverse();
+}
 
 export type ProgressionKind = 'reps' | 'sets' | 'weight';
 
@@ -113,9 +155,13 @@ function buildStep(
   };
 }
 
-function labelFor(kind: ProgressionKind, b: { weight: number; reps: number; sets: number }) {
+function labelFor(
+  kind: ProgressionKind,
+  b: { weight: number; reps: number; sets: number },
+  unit: WeightUnit
+) {
   if (b.weight > 0) {
-    return `${b.sets}×${b.reps} @ ${b.weight} kg`;
+    return `${b.sets}×${b.reps} @ ${formatWeight(b.weight, unit)}`;
   }
   return `${b.sets}×${b.reps} (bodyweight)`;
 }
@@ -125,23 +171,24 @@ function messageFor(
   name: string,
   count: number,
   baseline: ProgressiveSuggestion['baseline'],
-  target: ProgressiveSuggestion['target']
+  target: ProgressiveSuggestion['target'],
+  unit: WeightUnit
 ): { title: string; message: string } {
   if (kind === 'reps') {
     return {
       title: `Time to push ${name}`,
-      message: `You've logged ${name} ${count} times in the last 3 months. Try aiming for ${target.reps} reps instead of ~${baseline.reps} — a small step that builds real growth.`,
+      message: `You've repeated this load on ${name} ${count} times. Try aiming for ${target.reps} reps instead of ~${baseline.reps} — a small step that builds real growth.`,
     };
   }
   if (kind === 'weight') {
     return {
       title: `Ready for a little more load`,
-      message: `Strong consistency on ${name} (${count} sessions in 3 months). Next time try ~${target.weight} kg (you’ve been around ${baseline.weight} kg). Keep form clean.`,
+      message: `You've held this combo on ${name} for ${count} sessions. Next time try ~${formatWeight(target.weight, unit)} (you’ve been around ${formatWeight(baseline.weight, unit)}). Keep form clean.`,
     };
   }
   return {
     title: `Add one more set`,
-    message: `You've shown up for ${name} ${count} times recently. Try ${target.sets} sets instead of ${baseline.sets} to keep progressing.`,
+    message: `You've repeated this combo on ${name} ${count} times. Try ${target.sets} sets instead of ${baseline.sets} to keep progressing.`,
   };
 }
 
@@ -149,18 +196,38 @@ export function getProgressiveSuggestions(
   workouts: Workout[],
   exercises: Exercise[],
   dismissedIds: string[] = [],
-  now = Date.now()
+  unit: WeightUnit = 'kg',
+  options?: {
+    enabled?: boolean;
+    threshold?: number;
+    now?: number;
+    snoozes?: ProgressionSnooze[];
+  }
 ): ProgressiveSuggestion[] {
+  if (options?.enabled === false) return [];
+
+  const threshold = clampProgressionThreshold(
+    options?.threshold ?? PROGRESSION_SESSION_THRESHOLD
+  );
+  const now = options?.now ?? Date.now();
+  const snoozes = options?.snoozes ?? [];
   const dismissed = new Set(dismissedIds);
   const progressMap = buildExerciseProgressMap(workouts, exercises);
   const suggestions: ProgressiveSuggestion[] = [];
 
   for (const progress of progressMap.values()) {
     const windowSessions = sessionsInWindow(progress.sessions, now);
-    if (windowSessions.length < PROGRESSION_SESSION_THRESHOLD) continue;
+    const streak = trailingComboStreak(windowSessions);
+    if (streak.length === 0) continue;
+    const key = comboKey(streak[streak.length - 1]);
+    const snooze = snoozes.find(
+      (item) => item.exerciseId === progress.exerciseId && item.comboKey === key
+    );
+    const needed = Math.max(threshold, snooze?.minStreak ?? 0);
+    if (streak.length < needed) continue;
 
-    const step = buildStep(windowSessions);
-    const id = `prog_${progress.exerciseId}_${step.kind}_${windowSessions.length}`;
+    const step = buildStep(streak);
+    const id = `prog_${progress.exerciseId}_${step.kind}_${streak.length}`;
     if (dismissed.has(id) || dismissed.has(`exercise:${progress.exerciseId}`)) {
       continue;
     }
@@ -168,9 +235,10 @@ export function getProgressiveSuggestions(
     const { title, message } = messageFor(
       step.kind,
       progress.exerciseName,
-      windowSessions.length,
+      streak.length,
       { weight: step.weight, reps: step.reps, sets: step.sets },
-      step.target
+      step.target,
+      unit
     );
 
     suggestions.push({
@@ -185,9 +253,9 @@ export function getProgressiveSuggestions(
         weight: step.weight,
         reps: step.reps,
         sets: step.sets,
-      }),
-      targetLabel: labelFor(step.kind, step.target),
-      sessionCount: windowSessions.length,
+      }, unit),
+      targetLabel: labelFor(step.kind, step.target, unit),
+      sessionCount: streak.length,
       baseline: {
         weight: step.weight,
         reps: step.reps,
@@ -236,10 +304,14 @@ export function getAlternativesByMuscle(
     .slice(0, limit);
 }
 
-export function progressionProgressLabel(progress: ExerciseProgress): string {
-  const n = progress.sessionsInLast3Months;
-  if (n >= PROGRESSION_SESSION_THRESHOLD) {
-    return `Ready for a push (${n} sessions / 3 mo)`;
+export function progressionProgressLabel(
+  progress: ExerciseProgress,
+  threshold = PROGRESSION_SESSION_THRESHOLD
+): string {
+  const n = trailingComboStreak(sessionsInWindow(progress.sessions)).length;
+  const goal = clampProgressionThreshold(threshold);
+  if (n >= goal) {
+    return `Ready for a push (${n} at this combo)`;
   }
-  return `${n}/${PROGRESSION_SESSION_THRESHOLD} sessions toward a growth tip`;
+  return `${n}/${goal} at this combo toward a growth tip`;
 }

@@ -2,6 +2,8 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Body, Button, Muted, useTheme } from '@/components/ui';
 import { Radius } from '@/constants/Colors';
+import { useSettings } from '@/context/SettingsContext';
+import { displayToKg, kgToDisplay, unitLabel } from '@/lib/weight';
 import type { SetEntry } from '@/types/workout';
 
 export function SetEditor({
@@ -18,13 +20,18 @@ export function SetEditor({
   onRemoveSet: (setId: string) => void;
 }) {
   const theme = useTheme();
+  const { weightUnit } = useSettings();
 
   return (
     <View style={{ gap: 10 }}>
       <View style={styles.setHeader}>
         <Muted style={styles.colSet}>SET</Muted>
         <Muted style={[styles.colNum, styles.colLabel]}>REPS</Muted>
-        {showWeight ? <Muted style={[styles.colNum, styles.colLabel]}>KG</Muted> : null}
+        {showWeight ? (
+          <Muted style={[styles.colNum, styles.colLabel]}>
+            {unitLabel(weightUnit).toUpperCase()}
+          </Muted>
+        ) : null}
         <Muted style={styles.colDone}> </Muted>
       </View>
 
@@ -40,8 +47,10 @@ export function SetEditor({
           {showWeight ? (
             <View style={styles.colNum}>
               <NumberField
-                value={set.weight}
-                onChange={(weight) => onChangeSet(set.id, { weight })}
+                value={kgToDisplay(set.weight, weightUnit)}
+                onChange={(weight) =>
+                  onChangeSet(set.id, { weight: displayToKg(weight, weightUnit) })
+                }
               />
             </View>
           ) : null}

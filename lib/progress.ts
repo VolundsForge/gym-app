@@ -63,10 +63,15 @@ export function buildExerciseProgressMap(
 
   for (const workout of finished) {
     for (const ex of workout.exercises) {
+      if (ex.muscleGroup === 'Cardio' || ex.timed || ex.exerciseId === 'ex_plank') continue;
       const completed = ex.sets.filter((s) => s.completed);
       if (completed.length === 0) continue;
 
-      const volume = completed.reduce((sum, s) => sum + s.weight * s.reps, 0);
+      const volume = completed.reduce((sum, s) => {
+        const reps = Number.isFinite(s.reps) ? s.reps : 0;
+        const weight = Number.isFinite(s.weight) ? s.weight : 0;
+        return sum + (weight > 0 ? weight * reps : reps);
+      }, 0);
       const bestWeight = Math.max(...completed.map((s) => s.weight));
       const bestReps = Math.max(...completed.map((s) => s.reps));
       const avgReps =
@@ -135,12 +140,7 @@ export function buildExerciseProgressMap(
 
     const firstVolume = first?.volume ?? 0;
     const lastVolume = last?.volume ?? 0;
-    const volumeChangePct =
-      firstVolume > 0
-        ? Math.round(((lastVolume - firstVolume) / firstVolume) * 100)
-        : lastVolume > 0
-          ? 100
-          : null;
+    const volumeChangePct = computeVolumeChangePct(sessions);
 
     result.set(exerciseId, {
       exerciseId,
@@ -186,10 +186,65 @@ export function getExerciseProgress(
   return buildExerciseProgressMap(workouts, exerciseCatalog).get(exerciseId);
 }
 
+function average(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, n) => sum + n, 0) / values.length;
+}
+
+/**
+ * Compare recent work with an earlier baseline.
+ * Weighted work uses best load so a lighter bar cannot show as a gain.
+ * Bodyweight uses reps × sets.
+ */
+export function computeVolumeChangePct(
+  sessions: ExerciseSessionSnapshot[]
+): number | null {
+  if (sessions.length < 2) return null;
+
+  const recentCount = Math.min(3, sessions.length - 1);
+  const recent = sessions.slice(-recentCount);
+  const baseline = sessions.slice(0, Math.max(1, sessions.length - recentCount));
+  const usesLoad = sessions.some(
+    (s) => (s.bestWeight || 0) > 0.05 || (s.avgWeight || 0) > 0.05
+  );
+
+  const metric = usesLoad
+    ? (s: ExerciseSessionSnapshot) =>
+        Number.isFinite(s.bestWeight) && s.bestWeight > 0
+          ? s.bestWeight
+          : s.avgWeight
+    : (s: ExerciseSessionSnapshot) =>
+        Math.max(0, s.bestReps) * Math.max(1, s.totalSets);
+
+  const baselineAvg = average(baseline.map(metric));
+  const recentAvg = average(recent.map(metric));
+  if (baselineAvg > 0 && Number.isFinite(recentAvg)) {
+    return ((recentAvg - baselineAvg) / baselineAvg) * 100;
+  }
+  if (recentAvg > 0 && baselineAvg <= 0) return 100;
+  return 0;
+}
+
+export function hasRecentLoadIncrease(progress: ExerciseProgress): boolean {
+  const sessions = progress.sessions;
+  if (sessions.length < 2) return false;
+  const last = sessions[sessions.length - 1];
+  const prev = sessions[sessions.length - 2];
+  return (
+    last.bestWeight > prev.bestWeight + 0.05 ||
+    last.bestReps > prev.bestReps ||
+    last.totalSets > prev.totalSets
+  );
+}
+
 /** Format growth for UI: "+12%" / "−5%" / "new". */
 export function formatGrowth(pct: number | null): string {
-  if (pct === null) return '—';
-  if (pct > 0) return `+${pct}%`;
-  if (pct < 0) return `${pct}%`;
-  return '0%';
+  if (pct === null || !Number.isFinite(pct)) return '—';
+  if (Math.abs(pct) < 0.05) return '0%';
+  if (Math.abs(pct) < 1) {
+    return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
+  }
+  const rounded = Math.round(pct);
+  if (rounded === 0) return pct > 0 ? '+1%' : '-1%';
+  return `${rounded > 0 ? '+' : ''}${rounded}%`;
 }

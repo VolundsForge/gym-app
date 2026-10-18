@@ -1,12 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Body, useTheme } from '@/components/ui';
+import { Body, Muted, useTheme } from '@/components/ui';
+import { Radius } from '@/constants/Colors';
 import { useSettings } from '@/context/SettingsContext';
 import { useAppTheme } from '@/context/ThemeContext';
+import {
+  PROGRESSION_THRESHOLD_MAX,
+  PROGRESSION_THRESHOLD_MIN,
+} from '@/lib/suggestions';
 
 export function HeaderPageTitle({ label }: { label: string }) {
   const theme = useTheme();
@@ -27,8 +32,18 @@ export function HeaderPageTitle({ label }: { label: string }) {
 export function HeaderMenuButton() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const { colorScheme, setColorScheme } = useAppTheme();
-  const { timerEnabled, setTimerEnabled } = useSettings();
+  const {
+    timerEnabled,
+    setTimerEnabled,
+    weightUnit,
+    setWeightUnit,
+    progressionNudgesEnabled,
+    setProgressionNudgesEnabled,
+    progressionSessionThreshold,
+    setProgressionSessionThreshold,
+  } = useSettings();
   const [open, setOpen] = useState(false);
   const dark = colorScheme === 'dark';
 
@@ -56,10 +71,15 @@ export function HeaderMenuButton() {
               {
                 top: insets.top + 48,
                 right: 12,
+                maxHeight: Math.max(280, windowHeight - insets.top - 72),
                 backgroundColor: theme.card,
                 borderColor: theme.border,
               },
             ]}>
+            <ScrollView
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled">
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Profile"
@@ -107,6 +127,118 @@ export function HeaderMenuButton() {
                 ios_backgroundColor={theme.muted}
               />
             </View>
+
+            <View style={[styles.separator, { backgroundColor: theme.border }]} />
+
+            <View style={styles.row}>
+              <Ionicons name="barbell-outline" size={22} color={theme.text} />
+              <Body style={{ fontWeight: '600', flex: 1 }}>Weight</Body>
+              <View
+                style={[
+                  styles.unitSwitch,
+                  { backgroundColor: theme.muted, borderColor: theme.border },
+                ]}>
+                {(['kg', 'lbs'] as const).map((unit) => {
+                  const selected = weightUnit === unit;
+                  return (
+                    <Pressable
+                      key={unit}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={unit === 'kg' ? 'Kilograms' : 'Pounds'}
+                      onPress={() => setWeightUnit(unit)}
+                      style={[
+                        styles.unitOption,
+                        selected
+                          ? { backgroundColor: theme.tint }
+                          : { backgroundColor: 'transparent' },
+                      ]}>
+                      <Body
+                        style={{
+                          fontWeight: '700',
+                          fontSize: 13,
+                          color: selected ? theme.onTint : theme.textSecondary,
+                        }}>
+                        {unit}
+                      </Body>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={[styles.separator, { backgroundColor: theme.border }]} />
+
+            <View style={styles.row}>
+              <Ionicons name="trending-up-outline" size={22} color={theme.text} />
+              <Body style={{ fontWeight: '600', flex: 1 }}>Growth tips</Body>
+              <Switch
+                value={progressionNudgesEnabled}
+                onValueChange={setProgressionNudgesEnabled}
+                trackColor={{ false: theme.muted, true: theme.tint }}
+                thumbColor="#FCFBF8"
+                ios_backgroundColor={theme.muted}
+              />
+            </View>
+            {progressionNudgesEnabled ? (
+              <View style={styles.nudgeBlock}>
+                <Muted>Same combo before a nudge</Muted>
+                <View style={styles.stepperRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Fewer repeats"
+                    disabled={progressionSessionThreshold <= PROGRESSION_THRESHOLD_MIN}
+                    onPress={() =>
+                      setProgressionSessionThreshold(progressionSessionThreshold - 1)
+                    }
+                    style={({ pressed }) => [
+                      styles.stepperButton,
+                      {
+                        backgroundColor: theme.muted,
+                        borderColor: theme.border,
+                        opacity:
+                          progressionSessionThreshold <= PROGRESSION_THRESHOLD_MIN
+                            ? 0.4
+                            : pressed
+                              ? 0.8
+                              : 1,
+                      },
+                    ]}>
+                    <Ionicons name="remove" size={18} color={theme.text} />
+                  </Pressable>
+                  <Body style={{ fontWeight: '800', fontSize: 18, minWidth: 28, textAlign: 'center' }}>
+                    {progressionSessionThreshold}
+                  </Body>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="More repeats"
+                    disabled={progressionSessionThreshold >= PROGRESSION_THRESHOLD_MAX}
+                    onPress={() =>
+                      setProgressionSessionThreshold(progressionSessionThreshold + 1)
+                    }
+                    style={({ pressed }) => [
+                      styles.stepperButton,
+                      {
+                        backgroundColor: theme.muted,
+                        borderColor: theme.border,
+                        opacity:
+                          progressionSessionThreshold >= PROGRESSION_THRESHOLD_MAX
+                            ? 0.4
+                            : pressed
+                              ? 0.8
+                              : 1,
+                      },
+                    ]}>
+                    <Ionicons name="add" size={18} color={theme.text} />
+                  </Pressable>
+                </View>
+                <Muted>
+                  How many times at the same sets, reps, and weight before a
+                  suggestion to add a little more.
+                </Muted>
+              </View>
+            ) : null}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -146,5 +278,37 @@ const styles = StyleSheet.create({
   separator: {
     height: StyleSheet.hairlineWidth,
     marginHorizontal: 12,
+  },
+  unitSwitch: {
+    flexDirection: 'row',
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 3,
+    gap: 2,
+  },
+  unitOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
+    minWidth: 44,
+    alignItems: 'center',
+  },
+  nudgeBlock: {
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+    gap: 10,
+  },
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  stepperButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

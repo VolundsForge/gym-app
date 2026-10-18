@@ -10,15 +10,34 @@ import {
   Subtitle,
   useTheme,
 } from '@/components/ui';
+import { useSettings } from '@/context/SettingsContext';
 import { useWorkouts } from '@/context/WorkoutContext';
 import { Radius } from '@/constants/Colors';
-import { formatGrowth } from '@/lib/progress';
+import { normalizeEquipment } from '@/lib/exercises';
+import { formatGrowth, hasRecentLoadIncrease } from '@/lib/progress';
+import { isComposingWorkout, usesWeight } from '@/lib/workout-plan';
 import { progressionProgressLabel } from '@/lib/suggestions';
 import { formatDate } from '@/lib/stats';
+import { formatWeight } from '@/lib/weight';
 
 export default function ProgressScreen() {
   const theme = useTheme();
-  const { ready, progressList, startWorkout, activeWorkout } = useWorkouts();
+  const { weightUnit, progressionNudgesEnabled, progressionSessionThreshold } =
+    useSettings();
+  const {
+    ready,
+    progressList,
+    activeWorkout,
+    progressiveSuggestions,
+    exerciseNextPlans,
+    exercises,
+  } = useWorkouts();
+  const nudgeIds = new Set(
+    progressiveSuggestions.map((tip) => tip.exerciseId)
+  );
+  const plannedIds = new Set(
+    exerciseNextPlans.map((plan) => plan.exerciseId)
+  );
   const topGrowth = progressList
     .filter((p) => p.volumeChangePct !== null && p.volumeChangePct > 0 && p.sessions.length >= 2)
     .slice(0, 3);
@@ -61,8 +80,14 @@ export default function ProgressScreen() {
                     <View style={{ flex: 1, gap: 2 }}>
                       <Body style={{ fontWeight: '700' }}>{p.exerciseName}</Body>
                       <Muted>
-                        {p.firstBestWeight} → {p.lastBestWeight} kg · {p.sessions.length}{' '}
-                        sessions
+                        {usesWeight(
+                          exercises.find((exercise) => exercise.id === p.exerciseId)
+                            ?.equipment,
+                          p.muscleGroup
+                        )
+                          ? `${formatWeight(p.firstBestWeight, weightUnit)} → ${formatWeight(p.lastBestWeight, weightUnit)} · `
+                          : ''}
+                        {p.sessions.length} sessions
                       </Muted>
                     </View>
                     <Body style={{ fontWeight: '800', color: theme.success }}>
@@ -78,10 +103,16 @@ export default function ProgressScreen() {
           <EmptyState
             title="No progress yet"
             message="Log the same exercise a few times — your growth will show up here and keep you motivated."
-            actionLabel={activeWorkout ? 'Continue workout' : 'Start a workout'}
+            actionLabel={
+              activeWorkout
+                ? isComposingWorkout(activeWorkout)
+                  ? 'Continue creating'
+                  : 'Continue workout'
+                : 'Go to Home'
+            }
             onAction={() => {
-              if (!activeWorkout) startWorkout();
-              router.push('/workout/active');
+              if (activeWorkout) router.push('/workout/active');
+              else router.replace('/');
             }}
           />
         }
@@ -91,6 +122,10 @@ export default function ProgressScreen() {
             item.volumeChangePct !== null && item.volumeChangePct > 0;
           const negative =
             item.volumeChangePct !== null && item.volumeChangePct < 0;
+          const highlight =
+            nudgeIds.has(item.exerciseId) ||
+            plannedIds.has(item.exerciseId) ||
+            hasRecentLoadIncrease(item);
 
           return (
             <Pressable
@@ -99,7 +134,8 @@ export default function ProgressScreen() {
                 styles.card,
                 {
                   backgroundColor: theme.card,
-                  borderColor: theme.border,
+                  borderColor: highlight ? theme.tint : theme.border,
+                  borderWidth: highlight ? 2 : StyleSheet.hairlineWidth,
                   opacity: pressed ? 0.88 : 1,
                 },
               ]}>
@@ -123,18 +159,34 @@ export default function ProgressScreen() {
                 <MuscleTags
                   primary={item.muscleGroup}
                   secondary={item.secondaryMuscleGroups}
+                  equipment={normalizeEquipment(
+                    exercises.find((exercise) => exercise.id === item.exerciseId)
+                      ?.equipment
+                  )}
+                  layout="stacked"
                 />
                 <Muted>{item.sessions.length} sessions total</Muted>
               </View>
               <Muted style={{ marginTop: 10 }}>
-                Best load: {item.firstBestWeight} → {item.lastBestWeight} kg · Best
-                reps: {item.firstBestReps} → {item.lastBestReps}
+                {usesWeight(
+                  exercises.find((exercise) => exercise.id === item.exerciseId)
+                    ?.equipment,
+                  item.muscleGroup
+                )
+                  ? `Best load: ${formatWeight(item.firstBestWeight, weightUnit)} → ${formatWeight(item.lastBestWeight, weightUnit)} · `
+                  : ''}
+                Best reps: {item.firstBestReps} → {item.lastBestReps}
               </Muted>
               <Muted style={{ marginTop: 4 }}>
-                {progressionProgressLabel(item)}
-                {item.lastSessionAt
-                  ? ` · Last ${formatDate(item.lastSessionAt)}`
-                  : ''}
+                {progressionNudgesEnabled
+                  ? `${progressionProgressLabel(item, progressionSessionThreshold)}${
+                      item.lastSessionAt
+                        ? ` · Last ${formatDate(item.lastSessionAt)}`
+                        : ''
+                    }`
+                  : item.lastSessionAt
+                    ? `Last ${formatDate(item.lastSessionAt)}`
+                    : ''}
               </Muted>
             </Pressable>
           );

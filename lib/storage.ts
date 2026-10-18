@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { Exercise, Workout, WorkoutTemplate } from '@/types/workout';
+import type {
+  Exercise,
+  ExerciseNextPlan,
+  ProgressionSnooze,
+  Workout,
+  WorkoutTemplate,
+} from '@/types/workout';
 
 const KEYS = {
   workouts: '@gym/workouts',
@@ -11,6 +17,11 @@ const KEYS = {
   profile: '@gym/profile',
   templates: '@gym/templates',
   timerEnabled: '@gym/timerEnabled',
+  weightUnit: '@gym/weightUnit',
+  progressionNudgesEnabled: '@gym/progressionNudgesEnabled',
+  progressionSessionThreshold: '@gym/progressionSessionThreshold',
+  progressionSnoozes: '@gym/progressionSnoozes',
+  exerciseNextPlans: '@gym/exerciseNextPlans',
 } as const;
 
 export type ColorScheme = 'light' | 'dark';
@@ -110,4 +121,71 @@ export async function loadTimerEnabled(): Promise<boolean> {
 
 export async function saveTimerEnabled(enabled: boolean): Promise<void> {
   await AsyncStorage.setItem(KEYS.timerEnabled, enabled ? 'true' : 'false');
+}
+
+export async function loadWeightUnit(): Promise<'kg' | 'lbs'> {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.weightUnit);
+    if (raw === 'lbs' || raw === 'kg') return raw;
+    return 'kg';
+  } catch {
+    return 'kg';
+  }
+}
+
+export async function saveWeightUnit(unit: 'kg' | 'lbs'): Promise<void> {
+  await AsyncStorage.setItem(KEYS.weightUnit, unit);
+}
+
+export async function loadProgressionNudgesEnabled(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.progressionNudgesEnabled);
+    if (raw === null) return true;
+    return raw === 'true';
+  } catch {
+    return true;
+  }
+}
+
+export async function saveProgressionNudgesEnabled(enabled: boolean): Promise<void> {
+  await AsyncStorage.setItem(
+    KEYS.progressionNudgesEnabled,
+    enabled ? 'true' : 'false'
+  );
+}
+
+export async function loadProgressionSessionThreshold(): Promise<number> {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.progressionSessionThreshold);
+    const n = raw == null ? NaN : Number(raw);
+    if (!Number.isFinite(n)) return 10;
+    return Math.min(20, Math.max(2, Math.round(n)));
+  } catch {
+    return 10;
+  }
+}
+
+export async function saveProgressionSessionThreshold(value: number): Promise<void> {
+  const n = Math.min(20, Math.max(2, Math.round(value)));
+  await AsyncStorage.setItem(KEYS.progressionSessionThreshold, String(n));
+}
+
+export async function loadProgressionSnoozes(): Promise<ProgressionSnooze[]> {
+  return readJson<ProgressionSnooze[]>(KEYS.progressionSnoozes, []);
+}
+
+export async function saveProgressionSnoozes(
+  snoozes: ProgressionSnooze[]
+): Promise<void> {
+  await writeJson(KEYS.progressionSnoozes, snoozes);
+}
+
+export async function loadExerciseNextPlans(): Promise<ExerciseNextPlan[]> {
+  return readJson<ExerciseNextPlan[]>(KEYS.exerciseNextPlans, []);
+}
+
+export async function saveExerciseNextPlans(
+  plans: ExerciseNextPlan[]
+): Promise<void> {
+  await writeJson(KEYS.exerciseNextPlans, plans);
 }

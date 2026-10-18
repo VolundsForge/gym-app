@@ -1,6 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useMemo } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   Badge,
@@ -12,41 +13,43 @@ import {
   MuscleTags,
   Screen,
   Subtitle,
-  Title,
   useTheme,
 } from '@/components/ui';
 import { getSecondaryMuscleGroups, normalizeEquipment } from '@/lib/exercises';
+import { useSettings } from '@/context/SettingsContext';
 import { useWorkouts } from '@/context/WorkoutContext';
 import { formatGrowth } from '@/lib/progress';
 import { progressionProgressLabel } from '@/lib/suggestions';
-import { formatDate } from '@/lib/stats';
+import { formatClockSeconds, formatDate } from '@/lib/stats';
+import { isTimedExercise, usesWeight } from '@/lib/workout-plan';
+import { formatWeight } from '@/lib/weight';
 
 export default function ExerciseDetailScreen() {
   const theme = useTheme();
+  const { weightUnit, progressionNudgesEnabled, progressionSessionThreshold } =
+    useSettings();
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
     exercises,
     getProgressFor,
-    getAlternatives,
     progressiveSuggestions,
     startWorkout,
     activeWorkout,
     beginPendingExercise,
+    workouts,
   } = useWorkouts();
-
-  const [showAlts, setShowAlts] = useState(false);
 
   const exercise = useMemo(
     () => exercises.find((e) => e.id === id),
     [exercises, id]
   );
   const progress = id ? getProgressFor(id) : undefined;
-  const alternatives = id ? getAlternatives(id) : [];
   const tip = progressiveSuggestions.find((s) => s.exerciseId === id);
 
   if (!exercise) {
     return (
       <Screen style={styles.centered}>
+        <Stack.Screen options={exerciseHeaderOptions('Exercise')} />
         <EmptyState
           title="Exercise not found"
           message="It may have been removed from your library."
@@ -63,29 +66,51 @@ export default function ExerciseDetailScreen() {
     router.push('/workout/active');
   };
 
+  const cardio = isTimedExercise(exercise);
   const sessions = [...(progress?.sessions ?? [])].reverse();
+  const cardioSessions = cardio
+    ? workouts
+        .filter((w) => w.finishedAt)
+        .flatMap((w) =>
+          w.exercises
+            .filter((ex) => ex.exerciseId === exercise.id)
+            .map((ex) => ({
+              workoutId: w.id,
+              date: w.finishedAt ?? w.startedAt,
+              durationSeconds: ex.durationSeconds ?? 0,
+              notes: ex.notes,
+            }))
+        )
+        .sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        )
+    : [];
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: exercise.name }} />
+      <Stack.Screen options={exerciseHeaderOptions(exercise.name)} />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={{ gap: 10 }}>
-          <Title style={{ fontSize: 26 }}>{exercise.name}</Title>
           <MuscleTags
             primary={exercise.muscleGroup}
             secondary={getSecondaryMuscleGroups(exercise)}
+            equipment={normalizeEquipment(exercise.equipment)}
             layout="stacked"
           />
-          <View style={{ gap: 4 }}>
-            <Muted>Equipment</Muted>
-            <Badge label={normalizeEquipment(exercise.equipment)} />
-          </View>
+          {exercise.notes ? (
+            <View style={{ gap: 4 }}>
+              <Muted>Notes</Muted>
+              <Subtitle>{exercise.notes}</Subtitle>
+            </View>
+          ) : null}
           <Subtitle>
-            Log sets over time to see growth. If this machine isn’t for you, grab an
-            alternative that hits the same primary muscle.
+            {cardio
+              ? 'Time this during a workout. Notes stay with the exercise for extra details.'
+              : 'Log sets over time to see growth.'}
           </Subtitle>
         </View>
 
+        {cardio ? null : (
         <View style={styles.statsRow}>
           <MiniStat
             label="Sessions"
@@ -93,7 +118,7 @@ export default function ExerciseDetailScreen() {
             theme={theme}
           />
           <MiniStat
-            label="Volume growth"
+            label="Growth"
             value={formatGrowth(progress?.volumeChangePct ?? null)}
             theme={theme}
             highlight={
@@ -108,8 +133,9 @@ export default function ExerciseDetailScreen() {
             theme={theme}
           />
         </View>
+        )}
 
-        {tip ? (
+        {cardio || !progressionNudgesEnabled ? null : tip ? (
           <Card
             style={{
               gap: 10,
@@ -130,88 +156,140 @@ export default function ExerciseDetailScreen() {
         ) : progress ? (
           <Card style={{ gap: 6 }}>
             <Body style={{ fontWeight: '700' }}>Progress path</Body>
-            <Muted>{progressionProgressLabel(progress)}</Muted>
+            <Muted>
+              {progressionProgressLabel(progress, progressionSessionThreshold)}
+            </Muted>
             <Subtitle>
-              After about 10 sessions of this exercise within 3 months, you’ll get a
-              gentle suggestion to add a little more (reps, sets, or weight).
+              After {progressionSessionThreshold} sessions at the same sets, reps,
+              and weight, you’ll get a gentle suggestion to add a little more.
             </Subtitle>
           </Card>
         ) : null}
 
         <Button label="Add to workout" onPress={() => void onTrain()} />
 
-        <Card style={{ gap: 10 }}>
-          <View style={styles.rowBetween}>
-            <Body style={{ fontWeight: '700', fontSize: 17 }}>
-              Don’t like this one?
-            </Body>
-            <Button
-              label={showAlts ? 'Hide' : 'Suggest others'}
-              variant="ghost"
-              onPress={() => setShowAlts((v) => !v)}
-              style={{ paddingVertical: 6, paddingHorizontal: 8 }}
-            />
-          </View>
-          <Subtitle>
-            Alternatives that hit the same primary muscle ({exercise.muscleGroup}).
-          </Subtitle>
-          {showAlts ? (
-            alternatives.length === 0 ? (
-              <Muted>No alternatives in your library yet — add a custom exercise.</Muted>
+        <View style={styles.historySection}>
+          <Body style={{ fontWeight: '700', fontSize: 18, textAlign: 'center' }}>
+            Session history
+          </Body>
+          {cardio ? (
+            cardioSessions.length === 0 ? (
+              <Muted style={{ textAlign: 'center' }}>No sessions yet</Muted>
             ) : (
-              alternatives.map((alt) => (
+              cardioSessions.map((s) => (
                 <Pressable
-                  key={alt.id}
-                  onPress={() => router.push(`/exercise/${alt.id}`)}
+                  key={`${s.workoutId}-${s.date}`}
+                  onPress={() => router.push(`/workout/${s.workoutId}`)}
                   style={[
-                    styles.altRow,
-                    { backgroundColor: theme.muted, borderColor: theme.border },
+                    styles.sessionRow,
+                    { backgroundColor: theme.card, borderColor: theme.border },
                   ]}>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Body style={{ fontWeight: '600' }}>{alt.name}</Body>
-                    <Muted>
-                      {alt.muscleGroup} · {normalizeEquipment(alt.equipment)}
-                    </Muted>
+                  <View style={styles.rowBetween}>
+                    <Body style={{ fontWeight: '700' }}>{formatDate(s.date)}</Body>
+                    <Muted>{formatClockSeconds(s.durationSeconds)}</Muted>
                   </View>
+                  {s.notes ? (
+                    <Muted numberOfLines={2} style={{ marginTop: 6 }}>
+                      {s.notes}
+                    </Muted>
+                  ) : null}
                 </Pressable>
               ))
             )
-          ) : null}
-        </Card>
-
-        <Body style={{ fontWeight: '700', fontSize: 18, marginTop: 4 }}>
-          Session history
-        </Body>
-        {sessions.length === 0 ? (
-          <EmptyState
-            title="Nothing logged yet"
-            message="When you complete sets on this exercise, each session appears here so you can see growth."
-            actionLabel="Log a session"
-            onAction={() => void onTrain()}
-          />
-        ) : (
-          sessions.map((s) => (
-            <Pressable
-              key={`${s.workoutId}-${s.date}`}
-              onPress={() => router.push(`/workout/${s.workoutId}`)}
-              style={[
-                styles.sessionRow,
-                { backgroundColor: theme.card, borderColor: theme.border },
-              ]}>
-              <View style={styles.rowBetween}>
-                <Body style={{ fontWeight: '700' }}>{formatDate(s.date)}</Body>
-                <Muted>{s.totalSets} sets</Muted>
-              </View>
-              <Muted style={{ marginTop: 6 }}>
-                Best {s.bestWeight} kg × {s.bestReps} reps · Volume{' '}
-                {Math.round(s.volume)} kg
-              </Muted>
-            </Pressable>
-          ))
-        )}
+          ) : sessions.length === 0 ? (
+            <Muted style={{ textAlign: 'center' }}>No sessions yet</Muted>
+          ) : (
+            sessions.map((s, index) => {
+              const prev = sessions[index + 1];
+              const showLoad = usesWeight(exercise.equipment, exercise.muscleGroup);
+              const improved =
+                !!prev &&
+                (s.totalSets > prev.totalSets ||
+                  s.bestReps > prev.bestReps ||
+                  (showLoad && s.bestWeight > prev.bestWeight + 0.05));
+              const stats = showLoad
+                ? `${s.totalSets} sets · ${s.bestReps} reps · ${formatWeight(s.bestWeight, weightUnit)}`
+                : `${s.totalSets} sets · ${s.bestReps} reps`;
+              return (
+                <Pressable
+                  key={`${s.workoutId}-${s.date}`}
+                  onPress={() => router.push(`/workout/${s.workoutId}`)}
+                  style={[
+                    styles.sessionRow,
+                    { backgroundColor: theme.card, borderColor: theme.border },
+                  ]}>
+                  <View style={styles.rowBetween}>
+                    <Body style={{ fontWeight: '700' }} numberOfLines={1}>
+                      {formatDate(s.date)}
+                    </Body>
+                    <Muted style={{ flex: 1 }} numberOfLines={1}>
+                      {stats}
+                    </Muted>
+                    <View style={styles.improveSlot}>
+                      {improved ? (
+                        <View
+                          style={[
+                            styles.improveGlow,
+                            {
+                              backgroundColor: 'rgba(63, 125, 78, 0.2)',
+                              boxShadow: '0 0 10px rgba(63, 125, 78, 0.75)',
+                            },
+                          ]}>
+                          <Ionicons
+                            name="arrow-up"
+                            size={16}
+                            color={theme.success}
+                            accessibilityLabel="Improved from last session"
+                          />
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                </Pressable>
+              );
+            })
+          )}
+        </View>
       </ScrollView>
     </Screen>
   );
+}
+
+function ExercisesHeaderBack() {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Back to Exercises"
+      onPress={() => {
+        if (router.canGoBack()) router.back();
+        else router.replace('/exercises');
+      }}
+      hitSlop={8}
+      style={styles.headerBack}>
+      <Ionicons name="chevron-back" size={28} color={theme.text} />
+      <Body
+        numberOfLines={1}
+        style={{
+          fontWeight: '600',
+          fontSize: 17,
+          letterSpacing: -0.3,
+          color: theme.text,
+        }}>
+        Exercises
+      </Body>
+    </Pressable>
+  );
+}
+
+function exerciseHeaderOptions(title: string) {
+  return {
+    title,
+    headerTitleAlign: 'center' as const,
+    headerBackVisible: false,
+    headerBackTitle: 'Exercises',
+    headerLeft: () => <ExercisesHeaderBack />,
+  };
 }
 
 function MiniStat({
@@ -245,10 +323,21 @@ function MiniStat({
 }
 
 const styles = StyleSheet.create({
+  headerBack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: Platform.OS === 'ios' ? -8 : 0,
+    paddingRight: 4,
+    maxWidth: 148,
+  },
   content: {
     padding: 20,
-    gap: 14,
-    paddingBottom: 48,
+    gap: 28,
+    paddingBottom: 56,
+  },
+  historySection: {
+    gap: 12,
+    marginTop: 20,
   },
   centered: {
     justifyContent: 'center',
@@ -263,17 +352,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  altRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
   sessionRow: {
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     padding: 14,
+  },
+  improveSlot: {
+    width: 26,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  improveGlow: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import { ExpandableNotes } from '@/components/expandable-notes';
 import {
   Badge,
   Body,
@@ -32,6 +33,7 @@ import {
   SECONDARY_MUSCLE_GROUPS,
   exerciseListRows,
   normalizeEquipment,
+  unusedEquipmentForMuscle,
 } from '@/lib/exercises';
 import type { Equipment, MuscleGroup } from '@/types/workout';
 
@@ -48,6 +50,7 @@ export default function ExercisesScreen() {
   const [secondaryMuscleGroups, setSecondaryMuscleGroups] = useState<
     MuscleGroup[]
   >([]);
+  const [notes, setNotes] = useState('');
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -71,11 +74,18 @@ export default function ExercisesScreen() {
       Alert.alert('Name required', 'Enter an exercise name.');
       return;
     }
-    await addCustomExercise(name, muscleGroup, secondaryMuscleGroups, equipment);
+    await addCustomExercise(
+      name,
+      muscleGroup,
+      secondaryMuscleGroups,
+      equipment,
+      notes
+    );
     setName('');
     setMuscleGroup('Full Body');
     setEquipment('Barbell / Dumbbell');
     setSecondaryMuscleGroups([]);
+    setNotes('');
     setModalOpen(false);
   };
 
@@ -85,6 +95,7 @@ export default function ExercisesScreen() {
     setMuscleGroup('Full Body');
     setEquipment('Barbell / Dumbbell');
     setSecondaryMuscleGroups([]);
+    setNotes('');
   };
 
   const toggleSecondary = (group: MuscleGroup) => {
@@ -125,6 +136,7 @@ export default function ExercisesScreen() {
               options={['All', ...EQUIPMENT_TYPES] as const}
               value={equipmentFilter}
               onChange={setEquipmentFilter}
+              inactiveOptions={unusedEquipmentForMuscle(exercises, filter)}
             />
           </View>
         }
@@ -167,6 +179,11 @@ export default function ExercisesScreen() {
               <Muted style={{ marginTop: 6 }}>
                 {exercise.muscleGroup} · {normalizeEquipment(exercise.equipment)}
               </Muted>
+              {exercise.notes ? (
+                <Muted numberOfLines={2} style={{ marginTop: 4 }}>
+                  {exercise.notes}
+                </Muted>
+              ) : null}
             </Pressable>
           );
         }}
@@ -199,6 +216,9 @@ export default function ExercisesScreen() {
                   key={item}
                   label={item}
                   selected={equipment === item}
+                  inactive={unusedEquipmentForMuscle(exercises, muscleGroup).includes(
+                    item
+                  )}
                   onPress={() => setEquipment(item)}
                 />
               ))}
@@ -223,7 +243,7 @@ export default function ExercisesScreen() {
                 />
               ))}
             </View>
-            <Muted>Also trained (optional)</Muted>
+            <Muted>Secondary (optional)</Muted>
             <Subtitle>
               Other muscles this hits along the way. Skip if it is an isolation
               move.
@@ -240,6 +260,13 @@ export default function ExercisesScreen() {
                 )
               )}
             </View>
+            <ExpandableNotes value={notes} onChange={setNotes} />
+            {muscleGroup === 'Cardio' ? (
+              <Subtitle>
+                Cardio is timed in the workout. Notes can hold machine program,
+                incline, or pace.
+              </Subtitle>
+            ) : null}
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Button
                 label="Cancel"

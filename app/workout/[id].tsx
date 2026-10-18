@@ -14,18 +14,22 @@ import {
   Subtitle,
   useTheme,
 } from '@/components/ui';
+import { useSettings } from '@/context/SettingsContext';
 import { useWorkouts } from '@/context/WorkoutContext';
 import {
+  formatClockSeconds,
   formatDate,
   formatDuration,
   formatTime,
   workoutVolume,
 } from '@/lib/stats';
-import { usesWeight } from '@/lib/workout-plan';
+import { isTimedExercise, usesWeight } from '@/lib/workout-plan';
+import { formatWeight } from '@/lib/weight';
 
 export default function WorkoutDetailScreen() {
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { weightUnit } = useSettings();
   const { getWorkout, deleteWorkout, exercises, activeWorkout, startFromWorkout } =
     useWorkouts();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -76,8 +80,15 @@ export default function WorkoutDetailScreen() {
           <View style={styles.statsRow}>
             <Stat label="Duration" value={formatDuration(workout.startedAt, workout.finishedAt)} />
             <Stat label="Exercises" value={String(workout.exercises.length)} />
-            <Stat label="Sets" value={String(completedSets)} />
-            <Stat label="Volume" value={`${Math.round(workoutVolume(workout))} kg`} />
+            {completedSets > 0 ? (
+              <Stat label="Sets" value={String(completedSets)} />
+            ) : null}
+            {workoutVolume(workout) > 0 ? (
+              <Stat
+                label="Volume"
+                value={formatWeight(workoutVolume(workout), weightUnit)}
+              />
+            ) : null}
           </View>
         </Card>
 
@@ -96,29 +107,47 @@ export default function WorkoutDetailScreen() {
                 }
               />
             </View>
-            {exercise.sets.map((set, index) => (
+            {exercise.notes ? <Subtitle>{exercise.notes}</Subtitle> : null}
+            {isTimedExercise(exercise) ? (
               <View
-                key={set.id}
                 style={[
                   styles.setRow,
                   {
-                    backgroundColor: set.completed ? theme.muted : 'transparent',
-                    opacity: set.completed ? 1 : 0.55,
+                    backgroundColor: theme.muted,
+                    opacity: 1,
                   },
                 ]}>
-                <Muted style={{ width: 48 }}>Set {index + 1}</Muted>
+                <Muted style={{ width: 48 }}>Time</Muted>
                 <Body style={{ flex: 1, fontWeight: '600' }}>
-                  {usesWeight(
-                    exercise.equipment ??
-                      exercises.find((e) => e.id === exercise.exerciseId)?.equipment,
-                    exercise.muscleGroup
-                  )
-                    ? `${set.weight} kg × ${set.reps} reps`
-                    : `${set.reps} reps`}
+                  {formatClockSeconds(exercise.durationSeconds ?? 0)}
                 </Body>
-                <Muted>{set.completed ? 'Done' : 'Skipped'}</Muted>
+                <Muted>{exercise.completed ? 'Done' : 'Open'}</Muted>
               </View>
-            ))}
+            ) : (
+              exercise.sets.map((set, index) => (
+                <View
+                  key={set.id}
+                  style={[
+                    styles.setRow,
+                    {
+                      backgroundColor: set.completed ? theme.muted : 'transparent',
+                      opacity: set.completed ? 1 : 0.55,
+                    },
+                  ]}>
+                  <Muted style={{ width: 48 }}>Set {index + 1}</Muted>
+                  <Body style={{ flex: 1, fontWeight: '600' }}>
+                    {usesWeight(
+                      exercises.find((e) => e.id === exercise.exerciseId)?.equipment ??
+                        exercise.equipment,
+                      exercise.muscleGroup
+                    )
+                      ? `${formatWeight(set.weight, weightUnit)} × ${set.reps} reps`
+                      : `${set.reps} reps`}
+                  </Body>
+                  <Muted>{set.completed ? 'Done' : 'Skipped'}</Muted>
+                </View>
+              ))
+            )}
           </Card>
         ))}
 

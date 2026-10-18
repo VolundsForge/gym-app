@@ -114,7 +114,11 @@ function RootLayoutNav() {
           />
           <Stack.Screen
             name="exercise/[id]"
-            options={{ title: 'Exercise', headerBackTitle: 'Back' }}
+            options={{
+              title: 'Exercise',
+              headerBackTitle: 'Exercises',
+              headerTitleAlign: 'center',
+            }}
           />
           <Stack.Screen name="profile" options={{ title: 'Profile' }} />
         </Stack>
