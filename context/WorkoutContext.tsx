@@ -122,6 +122,7 @@ type WorkoutContextValue = {
     equipment?: Equipment,
     notes?: string
   ) => Promise<Exercise>;
+  setExerciseNotes: (exerciseId: string, notes: string) => Promise<void>;
   updateExerciseNotes: (workoutExerciseId: string, notes: string) => Promise<void>;
   startCardioTimer: (workoutExerciseId: string) => Promise<void>;
   pauseCardioTimer: (workoutExerciseId: string) => Promise<void>;
@@ -263,6 +264,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const persistExercises = useCallback(async (next: Exercise[]) => {
+    exercisesRef.current = next;
     setExercises(next);
     await saveExercises(next);
   }, []);
@@ -369,6 +371,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
             ...ex,
             equipment: catalog?.equipment ?? ex.equipment,
             timed: catalog?.timed ?? ex.timed,
+            notes: catalog ? catalog.notes : ex.notes,
           };
         }),
         phase: 'review',
@@ -620,14 +623,45 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     [mapActiveExercise]
   );
 
+  const setExerciseNotes = useCallback(
+    async (exerciseId: string, notes: string) => {
+      const trimmed = notes.trim() ? notes : undefined;
+      const nextLibrary = exercisesRef.current.map((item) =>
+        item.id === exerciseId ? { ...item, notes: trimmed } : item
+      );
+      await persistExercises(nextLibrary);
+
+      await patchActive((current) => {
+        const pendingMatch = current.pendingExercise?.exerciseId === exerciseId;
+        const listMatch = current.exercises.some((ex) => ex.exerciseId === exerciseId);
+        if (!pendingMatch && !listMatch) return current;
+        return {
+          ...current,
+          pendingExercise:
+            pendingMatch && current.pendingExercise
+              ? { ...current.pendingExercise, notes: trimmed }
+              : current.pendingExercise,
+          exercises: current.exercises.map((ex) =>
+            ex.exerciseId === exerciseId ? { ...ex, notes: trimmed } : ex
+          ),
+        };
+      });
+    },
+    [persistExercises, patchActive]
+  );
+
   const updateExerciseNotes = useCallback(
     async (workoutExerciseId: string, notes: string) => {
-      await mapActiveExercise(workoutExerciseId, (ex) => ({
-        ...ex,
-        notes: notes.trim() ? notes : undefined,
-      }));
+      const current = desiredActiveRef.current;
+      if (!current) return;
+      const target =
+        current.pendingExercise?.id === workoutExerciseId
+          ? current.pendingExercise
+          : current.exercises.find((ex) => ex.id === workoutExerciseId);
+      if (!target) return;
+      await setExerciseNotes(target.exerciseId, notes);
     },
-    [mapActiveExercise]
+    [setExerciseNotes]
   );
 
   const startCardioTimer = useCallback(
@@ -1109,6 +1143,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       reorderTemplates,
       getWorkout,
       addCustomExercise,
+      setExerciseNotes,
       updateExerciseNotes,
       startCardioTimer,
       pauseCardioTimer,
@@ -1160,6 +1195,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       reorderTemplates,
       getWorkout,
       addCustomExercise,
+      setExerciseNotes,
       updateExerciseNotes,
       startCardioTimer,
       pauseCardioTimer,

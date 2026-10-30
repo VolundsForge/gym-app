@@ -15,8 +15,9 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import Colors, { Radius, Typeface } from '@/constants/Colors';
+import Colors, { Radius, SCREEN_GUTTER, Typeface } from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const typeface = Platform.OS === 'web' ? { fontFamily: Typeface.web } : null;
 
@@ -25,8 +26,27 @@ export function useTheme() {
   return Colors[scheme];
 }
 
+export function useScreenGutter() {
+  const insets = useSafeAreaInsets();
+  return SCREEN_GUTTER + Math.max(insets.left, insets.right);
+}
+
 export function Screen({ style, ...props }: ViewProps) {
-  return <View style={[{ flex: 1, backgroundColor: 'transparent' }, style]} {...props} />;
+  const gutter = useScreenGutter();
+  return (
+    <View
+      style={[
+        {
+          flex: 1,
+          backgroundColor: 'transparent',
+          paddingLeft: gutter,
+          paddingRight: gutter,
+        },
+        style,
+      ]}
+      {...props}
+    />
+  );
 }
 
 export function Card({ style, ...props }: ViewProps) {
@@ -383,10 +403,12 @@ export function Badge({
   label,
   tone = 'primary',
   style,
+  nowrap,
 }: {
   label: string;
   tone?: 'primary' | 'secondary';
   style?: StyleProp<ViewStyle>;
+  nowrap?: boolean;
 }) {
   const theme = useTheme();
   return (
@@ -398,13 +420,14 @@ export function Badge({
           paddingVertical: 4,
           borderRadius: Radius.pill,
           alignSelf: 'flex-start',
-          maxWidth: '100%',
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: tone === 'primary' ? theme.tint : theme.border,
         },
+        nowrap ? { flexShrink: 0 } : { maxWidth: '100%' },
         style,
       ]}>
       <Muted
+        numberOfLines={nowrap ? 1 : undefined}
         style={{
           fontWeight: '600',
           color: tone === 'primary' ? theme.tint : theme.textSecondary,
@@ -424,9 +447,24 @@ export function MuscleTags({
   primary: string;
   secondary?: string[];
   equipment?: string;
-  layout?: 'row' | 'stacked' | 'compact';
+  layout?: 'row' | 'stacked' | 'compact' | 'pills';
 }) {
   const extras = (secondary ?? []).filter((group) => group && group !== primary);
+
+  if (layout === 'pills') {
+    const pillStyle = { alignSelf: 'center' as const };
+    return (
+      <>
+        <Badge label={primary} style={pillStyle} />
+        {extras.map((group) => (
+          <Badge key={group} label={group} tone="secondary" style={pillStyle} />
+        ))}
+        {equipment ? (
+          <Badge label={equipment} tone="secondary" nowrap style={pillStyle} />
+        ) : null}
+      </>
+    );
+  }
 
   if (layout === 'compact') {
     return (
@@ -468,10 +506,22 @@ export function MuscleTags({
             <Muted>—</Muted>
           )}
         </View>
-        <View style={{ flex: 1, minWidth: 0, gap: 4, alignItems: 'center' }}>
+        <View
+          style={{
+            flexGrow: 1,
+            flexShrink: 0,
+            flexBasis: 'auto',
+            gap: 4,
+            alignItems: 'center',
+          }}>
           <Muted style={{ textAlign: 'center' }}>Equipment</Muted>
           {equipment ? (
-            <Badge label={equipment} tone="secondary" style={{ alignSelf: 'center' }} />
+            <Badge
+              label={equipment}
+              tone="secondary"
+              nowrap
+              style={{ alignSelf: 'center' }}
+            />
           ) : (
             <Muted>—</Muted>
           )}

@@ -196,7 +196,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   content: {
-    padding: 20,
+    paddingVertical: 20,
     gap: 12,
     paddingBottom: 40,
   },

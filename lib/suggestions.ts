@@ -304,14 +304,28 @@ export function getAlternativesByMuscle(
     .slice(0, limit);
 }
 
+export function progressionComboProgress(
+  progress: ExerciseProgress,
+  threshold = PROGRESSION_SESSION_THRESHOLD
+): { current: number; goal: number; ratio: number; ready: boolean } {
+  const n = trailingComboStreak(sessionsInWindow(progress.sessions)).length;
+  const goal = clampProgressionThreshold(threshold);
+  const ratio = goal <= 0 ? 0 : Math.min(1, n / goal);
+  return {
+    current: n,
+    goal,
+    ratio,
+    ready: n >= goal && n > 0,
+  };
+}
+
 export function progressionProgressLabel(
   progress: ExerciseProgress,
   threshold = PROGRESSION_SESSION_THRESHOLD
 ): string {
-  const n = trailingComboStreak(sessionsInWindow(progress.sessions)).length;
-  const goal = clampProgressionThreshold(threshold);
-  if (n >= goal) {
-    return `Ready for a push (${n} at this combo)`;
+  const { current, goal, ready } = progressionComboProgress(progress, threshold);
+  if (ready) {
+    return `Ready for a push (${current} at this combo)`;
   }
-  return `${n}/${goal} at this combo toward a growth tip`;
+  return `${current}/${goal} at this combo toward a growth tip`;
 }

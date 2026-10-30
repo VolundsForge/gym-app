@@ -31,7 +31,7 @@ import {
 } from '@/components/ui';
 import { useColorScheme } from '@/components/useColorScheme';
 import { CardioTimer } from '@/components/cardio-timer';
-import { ExpandableNotes } from '@/components/expandable-notes';
+import { HeaderNotes } from '@/components/expandable-notes';
 import { GrowthTipsReview } from '@/components/growth-tips-review';
 import { SetEditor } from '@/components/workout-sets';
 import { Radius, Typeface } from '@/constants/Colors';
@@ -416,42 +416,35 @@ export default function ActiveWorkoutScreen() {
 
             {pending ? (
               <Card style={{ gap: 12 }}>
-                <View style={{ gap: 4 }}>
-                  <Badge label="Now adding" />
-                  <Body style={{ fontWeight: '700', fontSize: 17 }}>
-                    {pending.exerciseName}
-                  </Body>
-                  <Muted>
-                    {pending.muscleGroup}
-                    {pending.equipment ? ` · ${pending.equipment}` : ''}
-                  </Muted>
-                </View>
+                <HeaderNotes
+                  key={pending.id}
+                  value={pending.notes ?? ''}
+                  onChange={(text) => void updateExerciseNotes(pending.id, text)}
+                  title={
+                    <>
+                      <Badge label="Now adding" />
+                      <Body style={{ fontWeight: '700', fontSize: 17 }}>
+                        {pending.exerciseName}
+                      </Body>
+                      <Muted>
+                        {pending.muscleGroup}
+                        {pending.equipment ? ` · ${pending.equipment}` : ''}
+                      </Muted>
+                    </>
+                  }
+                />
                 {isTimedExercise(pending) ? (
                   composing ? (
-                    <>
-                      <Subtitle>
-                        This one is timed when you perform the workout. Add it to the
-                        list, then start the workout from Home when you are ready.
-                      </Subtitle>
-                      <ExpandableNotes
-                        value={pending.notes ?? ''}
-                        onChange={(text) =>
-                          void updateExerciseNotes(pending.id, text)
-                        }
-                      />
-                    </>
+                    <Subtitle>
+                      This one is timed when you perform the workout. Add it to the
+                      list, then start the workout from Home when you are ready.
+                    </Subtitle>
                   ) : (
                     <>
                       <Subtitle>
                         Time this exercise while you work. Notes can hold extra
                         details.
                       </Subtitle>
-                      <ExpandableNotes
-                        value={pending.notes ?? ''}
-                        onChange={(text) =>
-                          void updateExerciseNotes(pending.id, text)
-                        }
-                      />
                       <CardioTimer
                         exercise={pending}
                         onStart={() => void startCardioTimer(pending.id)}
@@ -478,12 +471,6 @@ export default function ActiveWorkoutScreen() {
                         : ''}
                       . Then add this exercise to the workout.
                     </Subtitle>
-                    <ExpandableNotes
-                      value={pending.notes ?? ''}
-                      onChange={(text) =>
-                        void updateExerciseNotes(pending.id, text)
-                      }
-                    />
                     <SetEditor
                       sets={pending.sets}
                       showWeight={exerciseUsesWeight(pending, catalogById)}
@@ -905,25 +892,34 @@ function ReviewExerciseCard({
 
   return (
     <Card style={{ gap: 10 }}>
-      <Pressable
-        onPress={() => {
-          if (done) setExpanded(false);
-        }}
-        style={styles.rowBetween}>
-        <View style={{ flex: 1, gap: 4 }}>
-          <Body style={{ fontWeight: '700', fontSize: 17 }}>{exercise.exerciseName}</Body>
-          <Muted>
-            {exercise.muscleGroup}
-            {equipment ? ` · ${equipment}` : ''}
-          </Muted>
-        </View>
-        {done ? (
-          <View style={[styles.doneTick, { backgroundColor: theme.success }]}>
-            <Ionicons name="checkmark" size={16} color="#FCFBF8" />
-          </View>
-        ) : null}
-      </Pressable>
-      <ExpandableNotes value={exercise.notes ?? ''} onChange={onNotesChange} />
+      <HeaderNotes
+        value={exercise.notes ?? ''}
+        onChange={onNotesChange}
+        title={
+          <Pressable
+            onPress={() => {
+              if (done) setExpanded(false);
+            }}
+            style={{ gap: 4 }}>
+            <Body style={{ fontWeight: '700', fontSize: 17 }}>
+              {exercise.exerciseName}
+            </Body>
+            <Muted>
+              {exercise.muscleGroup}
+              {equipment ? ` · ${equipment}` : ''}
+            </Muted>
+          </Pressable>
+        }
+        trailing={
+          done ? (
+            <Pressable onPress={() => setExpanded(false)}>
+              <View style={[styles.doneTick, { backgroundColor: theme.success }]}>
+                <Ionicons name="checkmark" size={16} color="#FCFBF8" />
+              </View>
+            </Pressable>
+          ) : null
+        }
+      />
       {cardio ? (
         <>
           <CardioTimer
@@ -1005,14 +1001,13 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   content: {
-    padding: 20,
+    paddingVertical: 20,
     gap: 14,
     paddingBottom: 48,
   },
   finishBar: {
     alignItems: 'center',
     paddingTop: 16,
-    paddingHorizontal: 20,
   },
   finishButton: {
     alignSelf: 'center',

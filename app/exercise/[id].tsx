@@ -3,6 +3,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { HeaderNotes } from '@/components/expandable-notes';
 import {
   Badge,
   Body,
@@ -36,6 +37,7 @@ export default function ExerciseDetailScreen() {
     startWorkout,
     activeWorkout,
     beginPendingExercise,
+    setExerciseNotes,
     workouts,
   } = useWorkouts();
 
@@ -97,16 +99,17 @@ export default function ExerciseDetailScreen() {
             equipment={normalizeEquipment(exercise.equipment)}
             layout="stacked"
           />
-          {exercise.notes ? (
-            <View style={{ gap: 4 }}>
-              <Muted>Notes</Muted>
-              <Subtitle>{exercise.notes}</Subtitle>
-            </View>
-          ) : null}
+          <HeaderNotes
+            value={exercise.notes ?? ''}
+            onChange={(text) => void setExerciseNotes(exercise.id, text)}
+            title={
+              <Body style={{ fontWeight: '700', fontSize: 17 }}>Notes</Body>
+            }
+          />
           <Subtitle>
             {cardio
-              ? 'Time this during a workout. Notes stay with the exercise for extra details.'
-              : 'Log sets over time to see growth.'}
+              ? 'Time this during a workout. Notes stay with this exercise across sessions.'
+              : 'Log sets over time to see growth. Notes stay with this exercise.'}
           </Subtitle>
         </View>
 
@@ -331,7 +334,7 @@ const styles = StyleSheet.create({
     maxWidth: 148,
   },
   content: {
-    padding: 20,
+    paddingVertical: 20,
     gap: 28,
     paddingBottom: 56,
   },

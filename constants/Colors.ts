@@ -16,6 +16,9 @@ export const Radius = {
   pill: 999,
 } as const;
 
+/** Horizontal page inset; matches the tab header title and hamburger. */
+export const SCREEN_GUTTER = 16;
+
 const tintLight = '#E56A12';
 const tintDark = '#FF8B3D';
 

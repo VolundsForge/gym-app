@@ -207,7 +207,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    padding: 20,
+    paddingVertical: 20,
     gap: 16,
     paddingBottom: 40,
   },

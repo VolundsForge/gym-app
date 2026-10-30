@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 
-import { ExpandableNotes } from '@/components/expandable-notes';
+import { ExpandableNotes, NotesIconButton } from '@/components/expandable-notes';
 import {
   Badge,
   Body,
@@ -23,6 +23,7 @@ import {
   Screen,
   Subtitle,
   Title,
+  useScreenGutter,
   useTheme,
 } from '@/components/ui';
 import { Radius } from '@/constants/Colors';
@@ -39,6 +40,7 @@ import type { Equipment, MuscleGroup } from '@/types/workout';
 
 export default function ExercisesScreen() {
   const theme = useTheme();
+  const gutter = useScreenGutter();
   const { exercises, addCustomExercise, deleteCustomExercise } = useWorkouts();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<MuscleGroup>('Chest');
@@ -174,16 +176,15 @@ export default function ExercisesScreen() {
               ]}>
               <View style={styles.rowBetween}>
                 <Body style={{ fontWeight: '700', flex: 1 }}>{exercise.name}</Body>
+                <NotesIconButton
+                  hasContent={!!exercise.notes?.trim()}
+                  onPress={() => router.push(`/exercise/${exercise.id}`)}
+                />
                 {exercise.isCustom ? <Badge label="Custom" /> : null}
               </View>
               <Muted style={{ marginTop: 6 }}>
                 {exercise.muscleGroup} · {normalizeEquipment(exercise.equipment)}
               </Muted>
-              {exercise.notes ? (
-                <Muted numberOfLines={2} style={{ marginTop: 4 }}>
-                  {exercise.notes}
-                </Muted>
-              ) : null}
             </Pressable>
           );
         }}
@@ -287,7 +288,11 @@ export default function ExercisesScreen() {
         onPress={() => setModalOpen(true)}
         style={({ pressed }) => [
           styles.fab,
-          { backgroundColor: theme.tint, opacity: pressed ? 0.85 : 1 },
+          {
+            right: gutter,
+            backgroundColor: theme.tint,
+            opacity: pressed ? 0.85 : 1,
+          },
         ]}>
         <Ionicons name="add" size={32} color={theme.onTint} />
       </Pressable>
@@ -297,12 +302,12 @@ export default function ExercisesScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    padding: 20,
+    paddingVertical: 20,
     paddingBottom: 96,
   },
   fab: {
     position: 'absolute',
-    right: 20,
+    right: 0,
     bottom: 20,
     width: 56,
     height: 56,

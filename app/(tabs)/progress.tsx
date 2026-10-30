@@ -16,7 +16,8 @@ import { Radius } from '@/constants/Colors';
 import { normalizeEquipment } from '@/lib/exercises';
 import { formatGrowth, hasRecentLoadIncrease } from '@/lib/progress';
 import { isComposingWorkout, usesWeight } from '@/lib/workout-plan';
-import { progressionProgressLabel } from '@/lib/suggestions';
+import { GrowthProgressBar } from '@/components/growth-progress-bar';
+import { progressionComboProgress } from '@/lib/suggestions';
 import { formatDate } from '@/lib/stats';
 import { formatWeight } from '@/lib/weight';
 
@@ -126,6 +127,9 @@ export default function ProgressScreen() {
             nudgeIds.has(item.exerciseId) ||
             plannedIds.has(item.exerciseId) ||
             hasRecentLoadIncrease(item);
+          const combo = progressionNudgesEnabled
+            ? progressionComboProgress(item, progressionSessionThreshold)
+            : null;
 
           return (
             <Pressable
@@ -139,13 +143,25 @@ export default function ProgressScreen() {
                   opacity: pressed ? 0.88 : 1,
                 },
               ]}>
-              <View style={styles.rowBetween}>
-                <Body style={{ fontWeight: '700', flex: 1, fontSize: 17 }}>
-                  {item.exerciseName}
-                </Body>
+              <View style={styles.titleRow}>
+                <View style={styles.titlePills}>
+                  <Body style={styles.exerciseName}>
+                    {item.exerciseName}
+                  </Body>
+                  <MuscleTags
+                    primary={item.muscleGroup}
+                    secondary={item.secondaryMuscleGroups}
+                    equipment={normalizeEquipment(
+                      exercises.find((exercise) => exercise.id === item.exerciseId)
+                        ?.equipment
+                    )}
+                    layout="pills"
+                  />
+                </View>
                 <Body
                   style={{
                     fontWeight: '800',
+                    flexShrink: 0,
                     color: positive
                       ? theme.success
                       : negative
@@ -154,18 +170,6 @@ export default function ProgressScreen() {
                   }}>
                   {growth}
                 </Body>
-              </View>
-              <View style={{ marginTop: 8, gap: 8 }}>
-                <MuscleTags
-                  primary={item.muscleGroup}
-                  secondary={item.secondaryMuscleGroups}
-                  equipment={normalizeEquipment(
-                    exercises.find((exercise) => exercise.id === item.exerciseId)
-                      ?.equipment
-                  )}
-                  layout="stacked"
-                />
-                <Muted>{item.sessions.length} sessions total</Muted>
               </View>
               <Muted style={{ marginTop: 10 }}>
                 {usesWeight(
@@ -177,17 +181,23 @@ export default function ProgressScreen() {
                   : ''}
                 Best reps: {item.firstBestReps} → {item.lastBestReps}
               </Muted>
-              <Muted style={{ marginTop: 4 }}>
-                {progressionNudgesEnabled
-                  ? `${progressionProgressLabel(item, progressionSessionThreshold)}${
-                      item.lastSessionAt
-                        ? ` · Last ${formatDate(item.lastSessionAt)}`
-                        : ''
-                    }`
-                  : item.lastSessionAt
-                    ? `Last ${formatDate(item.lastSessionAt)}`
-                    : ''}
-              </Muted>
+              {combo ? (
+                <View style={{ marginTop: 12 }}>
+                  <GrowthProgressBar
+                    ratio={combo.ratio}
+                    seed={item.exerciseId}
+                    ready={combo.ready}
+                    current={combo.current}
+                    goal={combo.goal}
+                  />
+                </View>
+              ) : null}
+              <View style={styles.cardFooter}>
+                <Muted>{item.sessions.length} sessions total</Muted>
+                {item.lastSessionAt ? (
+                  <Muted>Last {formatDate(item.lastSessionAt)}</Muted>
+                ) : null}
+              </View>
             </Pressable>
           );
         }}
@@ -198,7 +208,7 @@ export default function ProgressScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    padding: 20,
+    paddingVertical: 20,
     paddingBottom: 40,
     flexGrow: 1,
   },
@@ -217,10 +227,30 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 10,
   },
-  rowBetween: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  titlePills: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  exerciseName: {
+    fontWeight: '700',
+    fontSize: 17,
+    marginRight: 10,
   },
   centered: {
     alignItems: 'center',

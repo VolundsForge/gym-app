@@ -190,7 +190,7 @@ export default function AddExerciseScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    padding: 20,
+    paddingVertical: 20,
     paddingBottom: 40,
   },
   card: {
