@@ -33,6 +33,7 @@ import {
   MUSCLE_GROUPS,
   SECONDARY_MUSCLE_GROUPS,
   exerciseListRows,
+  filterExerciseCatalog,
   normalizeEquipment,
   unusedEquipmentForMuscle,
 } from '@/lib/exercises';
@@ -54,22 +55,31 @@ export default function ExercisesScreen() {
   >([]);
   const [notes, setNotes] = useState('');
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return exercises.filter((ex) => {
-      const matchesQuery = !q || ex.name.toLowerCase().includes(q);
-      const matchesGroup = ex.muscleGroup === filter;
-      const matchesEquipment =
-        equipmentFilter === 'All' ||
-        normalizeEquipment(ex.equipment) === equipmentFilter;
-      return matchesQuery && matchesGroup && matchesEquipment;
-    });
-  }, [exercises, query, filter, equipmentFilter]);
+  const filtered = useMemo(
+    () => filterExerciseCatalog(exercises, query, filter, equipmentFilter),
+    [exercises, query, filter, equipmentFilter]
+  );
 
   const rows = useMemo(
     () => exerciseListRows(filtered, equipmentFilter === 'All'),
     [filtered, equipmentFilter]
   );
+  const unusedForFilter = useMemo(
+    () => unusedEquipmentForMuscle(exercises, filter),
+    [exercises, filter]
+  );
+  const unusedForModal = useMemo(
+    () => unusedEquipmentForMuscle(exercises, muscleGroup),
+    [exercises, muscleGroup]
+  );
+
+  const resetForm = () => {
+    setName('');
+    setMuscleGroup('Full Body');
+    setEquipment('Barbell / Dumbbell');
+    setSecondaryMuscleGroups([]);
+    setNotes('');
+  };
 
   const onAdd = async () => {
     if (!name.trim()) {
@@ -83,21 +93,13 @@ export default function ExercisesScreen() {
       equipment,
       notes
     );
-    setName('');
-    setMuscleGroup('Full Body');
-    setEquipment('Barbell / Dumbbell');
-    setSecondaryMuscleGroups([]);
-    setNotes('');
+    resetForm();
     setModalOpen(false);
   };
 
   const closeModal = () => {
     setModalOpen(false);
-    setName('');
-    setMuscleGroup('Full Body');
-    setEquipment('Barbell / Dumbbell');
-    setSecondaryMuscleGroups([]);
-    setNotes('');
+    resetForm();
   };
 
   const toggleSecondary = (group: MuscleGroup) => {
@@ -138,7 +140,7 @@ export default function ExercisesScreen() {
               options={['All', ...EQUIPMENT_TYPES] as const}
               value={equipmentFilter}
               onChange={setEquipmentFilter}
-              inactiveOptions={unusedEquipmentForMuscle(exercises, filter)}
+              inactiveOptions={unusedForFilter}
             />
           </View>
         }
@@ -177,6 +179,7 @@ export default function ExercisesScreen() {
               <View style={styles.rowBetween}>
                 <Body style={{ fontWeight: '700', flex: 1 }}>{exercise.name}</Body>
                 <NotesIconButton
+                  compact
                   hasContent={!!exercise.notes?.trim()}
                   onPress={() => router.push(`/exercise/${exercise.id}`)}
                 />
@@ -217,9 +220,7 @@ export default function ExercisesScreen() {
                   key={item}
                   label={item}
                   selected={equipment === item}
-                  inactive={unusedEquipmentForMuscle(exercises, muscleGroup).includes(
-                    item
-                  )}
+                  inactive={unusedForModal.includes(item)}
                   onPress={() => setEquipment(item)}
                 />
               ))}
@@ -320,7 +321,8 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    padding: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     marginBottom: 10,
   },
   rowBetween: {

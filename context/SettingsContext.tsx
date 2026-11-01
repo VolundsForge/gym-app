@@ -7,12 +7,17 @@ import React, {
   useState,
 } from 'react';
 
+import type { GymBackup } from '@/lib/backup';
 import { hideWorkoutTimerNotification, requestTimerPermissions } from '@/lib/workout-notification';
 import {
+  loadHasOpenedApp,
+  loadProfile,
   loadProgressionNudgesEnabled,
   loadProgressionSessionThreshold,
   loadTimerEnabled,
   loadWeightUnit,
+  saveHasOpenedApp,
+  saveProfile,
   saveProgressionNudgesEnabled,
   saveProgressionSessionThreshold,
   saveTimerEnabled,
@@ -25,6 +30,9 @@ import {
 import type { WeightUnit } from '@/lib/weight';
 
 type SettingsContextValue = {
+  displayName: string;
+  setDisplayName: (name: string) => void;
+  openedAppBefore: boolean;
   timerEnabled: boolean;
   setTimerEnabled: (enabled: boolean) => void;
   weightUnit: WeightUnit;
@@ -33,11 +41,17 @@ type SettingsContextValue = {
   setProgressionNudgesEnabled: (enabled: boolean) => void;
   progressionSessionThreshold: number;
   setProgressionSessionThreshold: (value: number) => void;
+  restoreFromBackup: (backup: GymBackup) => Promise<void>;
 };
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
+/** Stays false for the first session even after we persist that the app has been opened. */
+let openedAppThisSession = false;
+
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
+  const [displayName, setDisplayNameState] = useState('');
+  const [openedAppBefore, setOpenedAppBefore] = useState(false);
   const [timerEnabled, setTimerState] = useState(false);
   const [weightUnit, setWeightUnitState] = useState<WeightUnit>('kg');
   const [progressionNudgesEnabled, setProgressionNudgesState] = useState(true);
@@ -48,14 +62,28 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [storedTimer, storedUnit, storedNudges, storedThreshold] =
-        await Promise.all([
-          loadTimerEnabled(),
-          loadWeightUnit(),
-          loadProgressionNudgesEnabled(),
-          loadProgressionSessionThreshold(),
-        ]);
+      const [
+        storedProfile,
+        storedOpened,
+        storedTimer,
+        storedUnit,
+        storedNudges,
+        storedThreshold,
+      ] = await Promise.all([
+        loadProfile(),
+        loadHasOpenedApp(),
+        loadTimerEnabled(),
+        loadWeightUnit(),
+        loadProgressionNudgesEnabled(),
+        loadProgressionSessionThreshold(),
+      ]);
       if (cancelled) return;
+      setDisplayNameState(storedProfile.name);
+      setOpenedAppBefore(storedOpened && !openedAppThisSession);
+      openedAppThisSession = true;
+      if (!storedOpened) {
+        void saveHasOpenedApp();
+      }
       setTimerState(storedTimer);
       setWeightUnitState(storedUnit);
       setProgressionNudgesState(storedNudges);
@@ -64,6 +92,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  const setDisplayName = useCallback((name: string) => {
+    const next = name.trim();
+    setDisplayNameState(next);
+    void saveProfile({ name: next });
   }, []);
 
   const setTimerEnabled = useCallback((enabled: boolean) => {
@@ -92,8 +126,32 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     void saveProgressionSessionThreshold(next);
   }, []);
 
+  const restoreFromBackup = useCallback(async (backup: GymBackup) => {
+    const name = backup.profile.name.trim();
+    const threshold = clampProgressionThreshold(
+      backup.settings.progressionSessionThreshold
+    );
+    setDisplayNameState(name);
+    setTimerState(backup.settings.timerEnabled);
+    setWeightUnitState(backup.settings.weightUnit);
+    setProgressionNudgesState(backup.settings.progressionNudgesEnabled);
+    setProgressionThresholdState(threshold);
+    setOpenedAppBefore(true);
+    await Promise.all([
+      saveProfile({ name }),
+      saveTimerEnabled(backup.settings.timerEnabled),
+      saveWeightUnit(backup.settings.weightUnit),
+      saveProgressionNudgesEnabled(backup.settings.progressionNudgesEnabled),
+      saveProgressionSessionThreshold(threshold),
+      saveHasOpenedApp(),
+    ]);
+  }, []);
+
   const value = useMemo(
     () => ({
+      displayName,
+      setDisplayName,
+      openedAppBefore,
       timerEnabled,
       setTimerEnabled,
       weightUnit,
@@ -102,8 +160,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setProgressionNudgesEnabled,
       progressionSessionThreshold,
       setProgressionSessionThreshold,
+      restoreFromBackup,
     }),
     [
+      displayName,
+      setDisplayName,
+      openedAppBefore,
       timerEnabled,
       setTimerEnabled,
       weightUnit,
@@ -112,6 +174,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setProgressionNudgesEnabled,
       progressionSessionThreshold,
       setProgressionSessionThreshold,
+      restoreFromBackup,
     ]
   );
 

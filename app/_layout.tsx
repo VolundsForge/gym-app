@@ -1,4 +1,3 @@
-import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
@@ -30,23 +29,11 @@ if (Platform.OS !== 'web') {
 }
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-
   useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  useEffect(() => {
-    if (loaded && Platform.OS !== 'web') {
-      SplashScreen.hideAsync();
+    if (Platform.OS !== 'web') {
+      void SplashScreen.hideAsync();
     }
-  }, [loaded]);
-
-  if (!loaded && Platform.OS !== 'web') {
-    return null;
-  }
+  }, []);
 
   return (
     <AppThemeProvider>

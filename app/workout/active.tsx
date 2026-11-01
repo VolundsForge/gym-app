@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useNavigation } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -36,6 +36,8 @@ import { GrowthTipsReview } from '@/components/growth-tips-review';
 import { SetEditor } from '@/components/workout-sets';
 import { Radius, Typeface } from '@/constants/Colors';
 import { useSettings } from '@/context/SettingsContext';
+import { indexById } from '@/lib/id';
+import { NATIVE_DRIVER } from '@/lib/native-driver';
 import { formatWeight } from '@/lib/weight';
 import { useWorkouts } from '@/context/WorkoutContext';
 import { useElapsedClock } from '@/hooks/useElapsedClock';
@@ -128,6 +130,7 @@ export default function ActiveWorkoutScreen() {
     !composing &&
     !isEmptyDraftWorkout(activeWorkout);
   const elapsed = useElapsedClock(activeWorkout?.startedAt, showTimer);
+  const catalogById = useMemo(() => indexById(exercises), [exercises]);
 
   const onCancelWorkout = () => {
     setEditOpen(false);
@@ -250,7 +253,6 @@ export default function ActiveWorkoutScreen() {
 
   const phase = workoutPhase(activeWorkout);
   const pending = activeWorkout.pendingExercise ?? null;
-  const catalogById = new Map(exercises.map((e) => [e.id, e]));
 
   const onAddToWorkout = async () => {
     const ok = await commitPendingExercise();
@@ -683,7 +685,7 @@ function WorkoutDoneCelebration({
       toValue: 1,
       friction: 6,
       tension: 80,
-      useNativeDriver: true,
+      useNativeDriver: NATIVE_DRIVER,
     }).start();
     burst.forEach((value, index) => {
       value.setValue(0);
@@ -692,7 +694,7 @@ function WorkoutDoneCelebration({
         duration: 720,
         delay: 40 * index,
         easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
+        useNativeDriver: NATIVE_DRIVER,
       }).start();
     });
   }, [burst, scale, visible]);

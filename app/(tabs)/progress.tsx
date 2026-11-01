@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useMemo } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import {
@@ -20,6 +21,7 @@ import { GrowthProgressBar } from '@/components/growth-progress-bar';
 import { progressionComboProgress } from '@/lib/suggestions';
 import { formatDate } from '@/lib/stats';
 import { formatWeight } from '@/lib/weight';
+import { indexById } from '@/lib/id';
 
 export default function ProgressScreen() {
   const theme = useTheme();
@@ -33,15 +35,27 @@ export default function ProgressScreen() {
     exerciseNextPlans,
     exercises,
   } = useWorkouts();
-  const nudgeIds = new Set(
-    progressiveSuggestions.map((tip) => tip.exerciseId)
+  const catalogById = useMemo(() => indexById(exercises), [exercises]);
+  const nudgeIds = useMemo(
+    () => new Set(progressiveSuggestions.map((tip) => tip.exerciseId)),
+    [progressiveSuggestions]
   );
-  const plannedIds = new Set(
-    exerciseNextPlans.map((plan) => plan.exerciseId)
+  const plannedIds = useMemo(
+    () => new Set(exerciseNextPlans.map((plan) => plan.exerciseId)),
+    [exerciseNextPlans]
   );
-  const topGrowth = progressList
-    .filter((p) => p.volumeChangePct !== null && p.volumeChangePct > 0 && p.sessions.length >= 2)
-    .slice(0, 3);
+  const topGrowth = useMemo(
+    () =>
+      progressList
+        .filter(
+          (p) =>
+            p.volumeChangePct !== null &&
+            p.volumeChangePct > 0 &&
+            p.sessions.length >= 2
+        )
+        .slice(0, 3),
+    [progressList]
+  );
 
   if (!ready) {
     return (
@@ -82,8 +96,7 @@ export default function ProgressScreen() {
                       <Body style={{ fontWeight: '700' }}>{p.exerciseName}</Body>
                       <Muted>
                         {usesWeight(
-                          exercises.find((exercise) => exercise.id === p.exerciseId)
-                            ?.equipment,
+                          catalogById.get(p.exerciseId)?.equipment,
                           p.muscleGroup
                         )
                           ? `${formatWeight(p.firstBestWeight, weightUnit)} → ${formatWeight(p.lastBestWeight, weightUnit)} · `
@@ -130,6 +143,7 @@ export default function ProgressScreen() {
           const combo = progressionNudgesEnabled
             ? progressionComboProgress(item, progressionSessionThreshold)
             : null;
+          const catalog = catalogById.get(item.exerciseId);
 
           return (
             <Pressable
@@ -151,10 +165,7 @@ export default function ProgressScreen() {
                   <MuscleTags
                     primary={item.muscleGroup}
                     secondary={item.secondaryMuscleGroups}
-                    equipment={normalizeEquipment(
-                      exercises.find((exercise) => exercise.id === item.exerciseId)
-                        ?.equipment
-                    )}
+                    equipment={normalizeEquipment(catalog?.equipment)}
                     layout="pills"
                   />
                 </View>
@@ -172,11 +183,7 @@ export default function ProgressScreen() {
                 </Body>
               </View>
               <Muted style={{ marginTop: 10 }}>
-                {usesWeight(
-                  exercises.find((exercise) => exercise.id === item.exerciseId)
-                    ?.equipment,
-                  item.muscleGroup
-                )
+                {usesWeight(catalog?.equipment, item.muscleGroup)
                   ? `Best load: ${formatWeight(item.firstBestWeight, weightUnit)} → ${formatWeight(item.lastBestWeight, weightUnit)} · `
                   : ''}
                 Best reps: {item.firstBestReps} → {item.lastBestReps}

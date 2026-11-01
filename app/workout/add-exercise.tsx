@@ -25,6 +25,7 @@ import {
   EQUIPMENT_TYPES,
   MUSCLE_GROUPS,
   exerciseListRows,
+  filterExerciseCatalog,
   normalizeEquipment,
   unusedEquipmentForMuscle,
 } from '@/lib/exercises';
@@ -44,21 +45,18 @@ export default function AddExerciseScreen() {
     return new Set(pendingId ? [...ids, pendingId] : ids);
   }, [activeWorkout]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return exercises.filter((ex) => {
-      const matchesQuery = !q || ex.name.toLowerCase().includes(q);
-      const matchesGroup = ex.muscleGroup === filter;
-      const matchesEquipment =
-        equipmentFilter === 'All' ||
-        normalizeEquipment(ex.equipment) === equipmentFilter;
-      return matchesQuery && matchesGroup && matchesEquipment;
-    });
-  }, [exercises, query, filter, equipmentFilter]);
+  const filtered = useMemo(
+    () => filterExerciseCatalog(exercises, query, filter, equipmentFilter),
+    [exercises, query, filter, equipmentFilter]
+  );
 
   const rows = useMemo(
     () => exerciseListRows(filtered, equipmentFilter === 'All'),
     [filtered, equipmentFilter]
+  );
+  const unusedEquipment = useMemo(
+    () => unusedEquipmentForMuscle(exercises, filter),
+    [exercises, filter]
   );
 
   if (!activeWorkout) {
@@ -127,7 +125,7 @@ export default function AddExerciseScreen() {
               options={['All', ...EQUIPMENT_TYPES] as const}
               value={equipmentFilter}
               onChange={setEquipmentFilter}
-              inactiveOptions={unusedEquipmentForMuscle(exercises, filter)}
+              inactiveOptions={unusedEquipment}
             />
             {query.trim() ? (
               <Button

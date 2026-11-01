@@ -474,6 +474,26 @@ export type ExerciseListRow =
   | { key: string; type: "header"; title: string }
   | { key: string; type: "item"; exercise: Exercise };
 
+export function filterExerciseCatalog(
+  exercises: Exercise[],
+  query: string,
+  muscleGroup: MuscleGroup,
+  equipmentFilter: Equipment | "All",
+): Exercise[] {
+  const q = query.trim().toLowerCase();
+  return exercises.filter((exercise) => {
+    if (q && !exercise.name.toLowerCase().includes(q)) return false;
+    if (exercise.muscleGroup !== muscleGroup) return false;
+    if (
+      equipmentFilter !== 'All' &&
+      normalizeEquipment(exercise.equipment) !== equipmentFilter
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
 export function exerciseListRows(
   exercises: Exercise[],
   groupByEquipment: boolean,

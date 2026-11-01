@@ -14,7 +14,7 @@ import {
   normalizeEquipment,
   normalizeSecondaryMuscleGroups,
 } from '@/lib/exercises';
-import { createId } from '@/lib/id';
+import { createId, indexById } from '@/lib/id';
 import {
   getExerciseProgress,
   listExerciseProgress,
@@ -28,6 +28,7 @@ import {
   type ProgressiveSuggestion,
 } from '@/lib/suggestions';
 import { useSettings } from '@/context/SettingsContext';
+import type { GymBackup } from '@/lib/backup';
 import {
   loadActiveWorkout,
   loadDismissedSuggestions,
@@ -141,6 +142,7 @@ type WorkoutContextValue = {
     suggestions: ProgressiveSuggestion[],
     extraSessions: number
   ) => Promise<void>;
+  restoreSnapshot: (backup: GymBackup) => Promise<void>;
 };
 
 const WorkoutContext = createContext<WorkoutContextValue | null>(null);
@@ -361,12 +363,13 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const startFromExercises = useCallback(
     (name: string, sourceExercises: WorkoutExercise[]) => {
       discardedRef.current = false;
+      const catalogById = indexById(exercisesRef.current);
       const workout: Workout = {
         id: createId('workout'),
         name,
         startedAt: new Date().toISOString(),
         exercises: cloneExercisesForReuse(sourceExercises).map((ex) => {
-          const catalog = exercisesRef.current.find((item) => item.id === ex.exerciseId);
+          const catalog = catalogById.get(ex.exerciseId);
           return {
             ...ex,
             equipment: catalog?.equipment ?? ex.equipment,
@@ -1102,6 +1105,39 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     [progressionSnoozes]
   );
 
+  const restoreSnapshot = useCallback(async (backup: GymBackup) => {
+    const mergedExercises =
+      backup.exercises.length > 0
+        ? mergeExerciseLibrary(backup.exercises)
+        : DEFAULT_EXERCISES;
+
+    discardedRef.current = true;
+    desiredActiveRef.current = null;
+    setActiveWorkout(null);
+    await saveActiveWorkout(null);
+    discardedRef.current = false;
+
+    setWorkouts(backup.workouts);
+    setTemplates(backup.templates);
+    exercisesRef.current = mergedExercises;
+    setExercises(mergedExercises);
+    setDismissedSuggestions(backup.dismissedSuggestions);
+    dismissedRef.current = backup.dismissedSuggestions;
+    setProgressionSnoozes(backup.progressionSnoozes);
+    snoozesRef.current = backup.progressionSnoozes;
+    setExerciseNextPlans(backup.exerciseNextPlans);
+    nextPlansRef.current = backup.exerciseNextPlans;
+
+    await Promise.all([
+      saveWorkouts(backup.workouts),
+      saveTemplates(backup.templates),
+      saveExercises(mergedExercises),
+      saveDismissedSuggestions(backup.dismissedSuggestions),
+      saveProgressionSnoozes(backup.progressionSnoozes),
+      saveExerciseNextPlans(backup.exerciseNextPlans),
+    ]);
+  }, []);
+
   const stats = useMemo(() => computeStats(workouts), [workouts]);
 
   const value = useMemo<WorkoutContextValue>(
@@ -1156,6 +1192,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       suggestionsForWorkout,
       applyExerciseNextPlans,
       delayGrowthTips,
+      restoreSnapshot,
     }),
     [
       ready,
@@ -1208,6 +1245,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       suggestionsForWorkout,
       applyExerciseNextPlans,
       delayGrowthTips,
+      restoreSnapshot,
     ]
   );
 

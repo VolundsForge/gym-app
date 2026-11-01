@@ -1,6 +1,13 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import { MyWorkoutsList } from '@/components/my-workouts-list';
 import {
@@ -12,22 +19,89 @@ import {
   Muted,
   Screen,
   Subtitle,
+  Title,
+  useScreenGutter,
   useTheme,
 } from '@/components/ui';
+import { Radius } from '@/constants/Colors';
+import { useSettings } from '@/context/SettingsContext';
 import { useWorkouts } from '@/context/WorkoutContext';
-import { formatDate } from '@/lib/stats';
 import {
-  formatWorkoutListMeta,
+  computeStats,
+  formatDate,
+  formatDayHeading,
+  formatDuration,
+} from '@/lib/stats';
+import {
+  formatExerciseCount,
   isComposingWorkout,
   isEmptyDraftWorkout,
   isLiveSessionWorkout,
   isLoggedWorkout,
+  workoutFocus,
   workoutPhase,
 } from '@/lib/workout-plan';
 import type { WorkoutTemplate } from '@/types/workout';
 
+const RECENT_TILE_GAP = 12;
+/** Prefer squares this size so name, category pill, and meta stay readable. */
+const COMFORTABLE_RECENT_TILE = 142;
+/** Keep three-up on regular phones when each square still fits the contents. */
+const PHONE_RECENT_TILE = 100;
+const MAX_RECENT_COLUMNS = 10;
+
+function recentWorkoutColumns(contentWidth: number): number {
+  if (contentWidth <= 0) return 3;
+  const comfortable = Math.floor(
+    (contentWidth + RECENT_TILE_GAP) /
+      (COMFORTABLE_RECENT_TILE + RECENT_TILE_GAP)
+  );
+  const threeSize = (contentWidth - 2 * RECENT_TILE_GAP) / 3;
+  if (threeSize >= PHONE_RECENT_TILE && comfortable < 3) {
+    return 3;
+  }
+  return Math.max(1, Math.min(MAX_RECENT_COLUMNS, comfortable));
+}
+
+function compactRecentDate(iso: string): string {
+  const heading = formatDayHeading(iso);
+  if (heading === 'Today' || heading === 'Yesterday') return heading;
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function homeWelcome(
+  displayName: string,
+  workoutsThisWeek: number,
+  returning: boolean
+): { title: string; message: string } {
+  const firstName = displayName.trim().split(/\s+/)[0];
+  const title = returning
+    ? firstName
+      ? `Welcome back, ${firstName}!`
+      : 'Welcome back!'
+    : firstName
+      ? `Welcome, ${firstName}!`
+      : 'Welcome!';
+  if (!returning || workoutsThisWeek <= 0) {
+    return { title, message: '' };
+  }
+  if (workoutsThisWeek === 1) {
+    return { title, message: "You've already trained once this week." };
+  }
+  return {
+    title,
+    message: `That's ${workoutsThisWeek} workouts this week already.`,
+  };
+}
+
 export default function HomeScreen() {
   const theme = useTheme();
+  const gutter = useScreenGutter();
+  const { width: windowWidth } = useWindowDimensions();
+  const { displayName, openedAppBefore } = useSettings();
   const {
     ready,
     workouts,
@@ -40,6 +114,7 @@ export default function HomeScreen() {
     null
   );
   const [draggingWorkouts, setDraggingWorkouts] = useState(false);
+  const [recentGridWidth, setRecentGridWidth] = useState(0);
 
   if (!ready) {
     return (
@@ -49,8 +124,28 @@ export default function HomeScreen() {
     );
   }
 
-  const logged = workouts.filter(isLoggedWorkout);
-  const recent = logged.slice(0, 3);
+  const logged = [...workouts]
+    .filter(isLoggedWorkout)
+    .sort(
+      (a, b) =>
+        new Date(b.finishedAt ?? b.startedAt).getTime() -
+        new Date(a.finishedAt ?? a.startedAt).getTime()
+    );
+  const contentWidth =
+    recentGridWidth > 0 ? recentGridWidth : windowWidth - gutter * 2;
+  const recentColumns = recentWorkoutColumns(contentWidth);
+  const recent = logged.slice(0, recentColumns * 2);
+  const recentTileWidth = Math.floor(
+    (contentWidth - RECENT_TILE_GAP * Math.max(0, recentColumns - 1)) /
+      recentColumns
+  );
+  const returning =
+    openedAppBefore || logged.length > 0 || templates.length > 0;
+  const welcome = homeWelcome(
+    displayName,
+    computeStats(workouts).workoutsThisWeek,
+    returning
+  );
 
   const composing =
     isComposingWorkout(activeWorkout) && !isEmptyDraftWorkout(activeWorkout);
@@ -71,10 +166,9 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         scrollEnabled={!draggingWorkouts}>
-        <View style={styles.header}>
-          <Subtitle>
-            Log sets and reps. Watch your growth over time.
-          </Subtitle>
+        <View style={styles.welcome}>
+          <Title style={styles.welcomeTitle}>{welcome.title}</Title>
+          {welcome.message ? <Subtitle>{welcome.message}</Subtitle> : null}
         </View>
 
         <MyWorkoutsList
@@ -153,33 +247,58 @@ export default function HomeScreen() {
             <View style={styles.sectionHeader}>
               <Body style={{ fontWeight: '700', fontSize: 18 }}>Recent workouts</Body>
             </View>
-            {recent.map((workout) => {
-              return (
-                <Card key={workout.id} style={{ gap: 6 }}>
-                  <View style={styles.rowBetween}>
-                    <Body style={{ fontWeight: '700', flex: 1 }}>{workout.name}</Body>
-                    <Muted>{formatDate(workout.finishedAt ?? workout.startedAt)}</Muted>
-                  </View>
-                  <Muted>{formatWorkoutListMeta(workout)}</Muted>
-                  <Button
-                    label="View details"
-                    variant="secondary"
+            <View
+              style={styles.recentGrid}
+              onLayout={(event) => {
+                const width = Math.round(event.nativeEvent.layout.width);
+                if (width > 0 && width !== recentGridWidth) {
+                  setRecentGridWidth(width);
+                }
+              }}>
+              {recent.map((workout) => {
+                const when = workout.finishedAt ?? workout.startedAt;
+                const focus = workoutFocus(workout);
+                const exerciseCount = formatExerciseCount(
+                  workout.exercises.length
+                );
+                return (
+                  <Pressable
+                    key={workout.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`View ${workout.name}, ${focus}, ${exerciseCount}`}
                     onPress={() => router.push(`/workout/${workout.id}`)}
-                    style={{ marginTop: 8 }}
-                  />
-                </Card>
-              );
-            })}
-            <Pressable
-              onPress={() => router.push('/history')}
-              hitSlop={6}
-              style={{ paddingVertical: 4 }}>
-              <Muted style={{ color: theme.tint, fontWeight: '600' }}>
-                {logged.length > 3
-                  ? 'See all workouts in History'
-                  : 'Open History'}
-              </Muted>
-            </Pressable>
+                    style={({ pressed }) => [
+                      styles.recentTile,
+                      {
+                        width: recentTileWidth,
+                        backgroundColor: theme.card,
+                        borderColor: theme.border,
+                        opacity: pressed ? 0.85 : 1,
+                      },
+                    ]}>
+                    <View style={styles.recentTop}>
+                      <Body numberOfLines={2} style={styles.recentName}>
+                        {workout.name}
+                      </Body>
+                      <Badge
+                        label={focus}
+                        nowrap
+                        style={styles.recentFocusBadge}
+                      />
+                    </View>
+                    <View style={styles.recentMeta}>
+                      <Muted numberOfLines={1} style={styles.recentMetaLine}>
+                        {exerciseCount}
+                      </Muted>
+                      <Muted numberOfLines={1} style={styles.recentMetaLine}>
+                        {compactRecentDate(when)} ·{' '}
+                        {formatDuration(workout.startedAt, workout.finishedAt)}
+                      </Muted>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
           </>
         ) : null}
       </ScrollView>
@@ -211,9 +330,13 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingBottom: 40,
   },
-  header: {
-    gap: 6,
-    marginTop: 8,
+  welcome: {
+    gap: 4,
+    marginTop: 4,
+  },
+  welcomeTitle: {
+    fontSize: 26,
+    lineHeight: 32,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -221,10 +344,38 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 8,
   },
-  rowBetween: {
+  recentGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: RECENT_TILE_GAP,
+  },
+  recentTile: {
+    minWidth: 0,
+    aspectRatio: 1,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 14,
+    justifyContent: 'space-between',
+  },
+  recentTop: {
     gap: 8,
+  },
+  recentName: {
+    fontWeight: '700',
+    fontSize: 16,
+    lineHeight: 21,
+  },
+  recentMeta: {
+    gap: 2,
+  },
+  recentFocusBadge: {
+    maxWidth: '100%',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  recentMetaLine: {
+    fontSize: 15,
+    lineHeight: 20,
   },
   centered: {
     alignItems: 'center',

@@ -15,6 +15,7 @@ const KEYS = {
   dismissedSuggestions: '@gym/dismissedSuggestions',
   colorScheme: '@gym/colorScheme',
   profile: '@gym/profile',
+  hasOpenedApp: '@gym/hasOpenedApp',
   templates: '@gym/templates',
   timerEnabled: '@gym/timerEnabled',
   weightUnit: '@gym/weightUnit',
@@ -100,6 +101,19 @@ export async function loadProfile(): Promise<UserProfile> {
 
 export async function saveProfile(profile: UserProfile): Promise<void> {
   await writeJson(KEYS.profile, profile);
+}
+
+export async function loadHasOpenedApp(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.hasOpenedApp);
+    return raw === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function saveHasOpenedApp(): Promise<void> {
+  await AsyncStorage.setItem(KEYS.hasOpenedApp, 'true');
 }
 
 export async function loadTemplates(): Promise<WorkoutTemplate[]> {

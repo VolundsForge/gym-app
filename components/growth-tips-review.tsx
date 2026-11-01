@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Body, Button, Muted, Subtitle, Title, useTheme } from '@/components/ui';
 import { Radius } from '@/constants/Colors';
 import { useSettings } from '@/context/SettingsContext';
+import { indexById } from '@/lib/id';
 import type { ProgressiveSuggestion } from '@/lib/suggestions';
 import { displayToKg, kgToDisplay, unitLabel } from '@/lib/weight';
 import { usesWeight } from '@/lib/workout-plan';
@@ -43,10 +44,7 @@ export function GrowthTipsReview({
   const [delayExtra, setDelayExtra] = useState(3);
   const [drafts, setDrafts] = useState<Record<string, ExerciseNextPlan>>({});
 
-  const catalogById = useMemo(
-    () => new Map(catalog.map((exercise) => [exercise.id, exercise])),
-    [catalog]
-  );
+  const catalogById = useMemo(() => indexById(catalog), [catalog]);
 
   useEffect(() => {
     if (!visible) return;
@@ -107,9 +105,7 @@ export function GrowthTipsReview({
             {suggestions.map((tip) => {
               const draft = drafts[tip.exerciseId];
               if (!draft) return null;
-              const equipment =
-                catalogById.get(tip.exerciseId)?.equipment ??
-                catalog.find((entry) => entry.id === tip.exerciseId)?.equipment;
+              const equipment = catalogById.get(tip.exerciseId)?.equipment;
               const showWeight = usesWeight(equipment, tip.muscleGroup);
               return (
                 <View

@@ -12,6 +12,7 @@ import {
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { Canvas } from '@/constants/Colors';
+import { NATIVE_DRIVER } from '@/lib/native-driver';
 
 type Edge = 0 | 1 | 2 | 3;
 
@@ -110,13 +111,13 @@ function Bubble({
           toValue: end.x,
           duration,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver: NATIVE_DRIVER,
         }),
         Animated.timing(y, {
           toValue: end.y,
           duration,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver: NATIVE_DRIVER,
         }),
       ]);
       motion.start(({ finished }) => {
@@ -180,12 +181,12 @@ export function AmbientBackground() {
       Animated.timing(tiltX, {
         toValue: accelX * 16 + gyroY * 5,
         duration: 220,
-        useNativeDriver: true,
+        useNativeDriver: NATIVE_DRIVER,
       }).start();
       Animated.timing(tiltY, {
         toValue: -accelY * 16 + gyroX * 5,
         duration: 220,
-        useNativeDriver: true,
+        useNativeDriver: NATIVE_DRIVER,
       }).start();
     };
 
@@ -232,8 +233,8 @@ export function AmbientBackground() {
         return;
       }
       stopSensors();
-      Animated.timing(tiltX, { toValue: 0, duration: 400, useNativeDriver: true }).start();
-      Animated.timing(tiltY, { toValue: 0, duration: 400, useNativeDriver: true }).start();
+      Animated.timing(tiltX, { toValue: 0, duration: 400, useNativeDriver: NATIVE_DRIVER }).start();
+      Animated.timing(tiltY, { toValue: 0, duration: 400, useNativeDriver: NATIVE_DRIVER }).start();
     });
 
     return () => {

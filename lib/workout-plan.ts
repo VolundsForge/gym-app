@@ -246,6 +246,60 @@ export function formatWorkoutListMeta(workout: Workout): string {
   return parts.join(' · ');
 }
 
+export type WorkoutFocus =
+  | 'Upper body'
+  | 'Lower body'
+  | 'Full body'
+  | 'Core'
+  | 'Cardio';
+
+const UPPER_MUSCLES = new Set<MuscleGroup>([
+  'Chest',
+  'Back',
+  'Shoulders',
+  'Arms',
+]);
+
+/** Rough session shape from primary muscles: arms/core/back → Upper body; add legs or mix in cardio → Full body. Cardio-only stays Cardio. */
+export function workoutFocus(
+  workout: Pick<Workout, 'exercises'>
+): WorkoutFocus {
+  let upper = false;
+  let lower = false;
+  let core = false;
+  let cardio = false;
+
+  for (const exercise of workout.exercises) {
+    const group = exercise.muscleGroup;
+    if (group === 'Cardio') {
+      cardio = true;
+    } else if (group === 'Legs') {
+      lower = true;
+    } else if (group === 'Full Body') {
+      upper = true;
+      lower = true;
+    } else if (group === 'Core') {
+      core = true;
+    } else if (UPPER_MUSCLES.has(group)) {
+      upper = true;
+    }
+  }
+
+  const strength = upper || lower || core;
+  if (cardio && strength) return 'Full body';
+  if (upper && lower) return 'Full body';
+  if (lower && core) return 'Full body';
+  if (lower) return 'Lower body';
+  if (upper) return 'Upper body';
+  if (core) return 'Core';
+  if (cardio) return 'Cardio';
+  return 'Full body';
+}
+
+export function formatExerciseCount(count: number): string {
+  return `${count} exercise${count === 1 ? '' : 's'}`;
+}
+
 export function pendingSetsAreReady(exercise: WorkoutExercise | null | undefined): boolean {
   if (!exercise) return false;
   if (isTimedExercise(exercise)) return true;

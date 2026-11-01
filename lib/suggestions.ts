@@ -288,22 +288,6 @@ export function getAlternativeExercises(
     .slice(0, limit);
 }
 
-export function getAlternativesByMuscle(
-  muscleGroup: MuscleGroup,
-  exercises: Exercise[],
-  excludeId?: string,
-  limit = 8
-): Exercise[] {
-  return exercises
-    .filter(
-      (e) =>
-        e.muscleGroup === muscleGroup &&
-        e.id !== excludeId &&
-        e.muscleGroup !== 'Cardio'
-    )
-    .slice(0, limit);
-}
-
 export function progressionComboProgress(
   progress: ExerciseProgress,
   threshold = PROGRESSION_SESSION_THRESHOLD

@@ -11,9 +11,11 @@ const NOTES_PLACEHOLDER =
 export function NotesIconButton({
   hasContent,
   onPress,
+  compact,
 }: {
   hasContent: boolean;
   onPress: () => void;
+  compact?: boolean;
 }) {
   const theme = useTheme();
   return (
@@ -22,10 +24,14 @@ export function NotesIconButton({
       accessibilityLabel={hasContent ? 'Exercise notes' : 'Add notes'}
       onPress={onPress}
       hitSlop={6}
-      style={({ pressed }) => [styles.iconHit, { opacity: pressed ? 0.75 : 1 }]}>
+      style={({ pressed }) => [
+        styles.iconHit,
+        compact ? styles.iconHitCompact : null,
+        { opacity: pressed ? 0.75 : 1 },
+      ]}>
       <Ionicons
         name="document-text-outline"
-        size={22}
+        size={compact ? 20 : 22}
         color={hasContent ? theme.tint : '#FFFFFF'}
       />
     </Pressable>
@@ -141,6 +147,10 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconHitCompact: {
+    width: 28,
+    height: 28,
   },
   expandButton: {
     alignSelf: 'flex-start',

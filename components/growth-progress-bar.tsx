@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 
 import { useTheme } from '@/components/ui';
+import { NATIVE_DRIVER } from '@/lib/native-driver';
 
 type Particle = {
   left: `${number}%`;
@@ -29,7 +30,7 @@ function startSharedShimmer() {
       toValue: 1,
       duration: 4200,
       easing: Easing.linear,
-      useNativeDriver: true,
+      useNativeDriver: NATIVE_DRIVER,
     })
   );
   shimmerLoop.start();

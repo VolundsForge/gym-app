@@ -1,5 +1,5 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import {
@@ -25,6 +25,7 @@ import {
 } from '@/lib/stats';
 import { isTimedExercise, usesWeight } from '@/lib/workout-plan';
 import { formatWeight } from '@/lib/weight';
+import { indexById } from '@/lib/id';
 
 export default function WorkoutDetailScreen() {
   const theme = useTheme();
@@ -35,6 +36,7 @@ export default function WorkoutDetailScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const workout = id ? getWorkout(id) : undefined;
+  const catalogById = useMemo(() => indexById(exercises), [exercises]);
 
   if (!workout) {
     return (
@@ -53,6 +55,7 @@ export default function WorkoutDetailScreen() {
     (n, ex) => n + ex.sets.filter((s) => s.completed).length,
     0
   );
+  const volume = workoutVolume(workout);
 
   const onDelete = async () => {
     if (deleting) return;
@@ -83,73 +86,76 @@ export default function WorkoutDetailScreen() {
             {completedSets > 0 ? (
               <Stat label="Sets" value={String(completedSets)} />
             ) : null}
-            {workoutVolume(workout) > 0 ? (
+            {volume > 0 ? (
               <Stat
                 label="Volume"
-                value={formatWeight(workoutVolume(workout), weightUnit)}
+                value={formatWeight(volume, weightUnit)}
               />
             ) : null}
           </View>
         </Card>
 
-        {workout.exercises.map((exercise) => (
-          <Card key={exercise.id} style={{ gap: 10 }}>
-            <View style={{ gap: 8 }}>
-              <Body style={{ fontWeight: '700', fontSize: 17 }}>
-                {exercise.exerciseName}
-              </Body>
-              <MuscleTags
-                primary={exercise.muscleGroup}
-                secondary={
-                  exercise.secondaryMuscleGroups ??
-                  exercises.find((e) => e.id === exercise.exerciseId)
-                    ?.secondaryMuscleGroups
-                }
-              />
-            </View>
-            {exercise.notes ? <Subtitle>{exercise.notes}</Subtitle> : null}
-            {isTimedExercise(exercise) ? (
-              <View
-                style={[
-                  styles.setRow,
-                  {
-                    backgroundColor: theme.muted,
-                    opacity: 1,
-                  },
-                ]}>
-                <Muted style={{ width: 48 }}>Time</Muted>
-                <Body style={{ flex: 1, fontWeight: '600' }}>
-                  {formatClockSeconds(exercise.durationSeconds ?? 0)}
+        {workout.exercises.map((exercise) => {
+          const catalog = catalogById.get(exercise.exerciseId);
+          return (
+            <Card key={exercise.id} style={{ gap: 10 }}>
+              <View style={{ gap: 8 }}>
+                <Body style={{ fontWeight: '700', fontSize: 17 }}>
+                  {exercise.exerciseName}
                 </Body>
-                <Muted>{exercise.completed ? 'Done' : 'Open'}</Muted>
+                <MuscleTags
+                  primary={exercise.muscleGroup}
+                  secondary={
+                    exercise.secondaryMuscleGroups ??
+                    catalog?.secondaryMuscleGroups
+                  }
+                />
               </View>
-            ) : (
-              exercise.sets.map((set, index) => (
+              {exercise.notes ? <Subtitle>{exercise.notes}</Subtitle> : null}
+              {isTimedExercise(exercise) ? (
                 <View
-                  key={set.id}
                   style={[
                     styles.setRow,
                     {
-                      backgroundColor: set.completed ? theme.muted : 'transparent',
-                      opacity: set.completed ? 1 : 0.55,
+                      backgroundColor: theme.muted,
+                      opacity: 1,
                     },
                   ]}>
-                  <Muted style={{ width: 48 }}>Set {index + 1}</Muted>
+                  <Muted style={{ width: 48 }}>Time</Muted>
                   <Body style={{ flex: 1, fontWeight: '600' }}>
-                    {usesWeight(
-                      exercises.find((e) => e.id === exercise.exerciseId)?.equipment ??
-                        exercise.equipment,
-                      exercise.muscleGroup
-                    )
-                      ? `${formatWeight(set.weight, weightUnit)} × ${set.reps} reps`
-                      : `${set.reps} reps`}
+                    {formatClockSeconds(exercise.durationSeconds ?? 0)}
                   </Body>
-                  <Muted>{set.completed ? 'Done' : 'Skipped'}</Muted>
+                  <Muted>{exercise.completed ? 'Done' : 'Open'}</Muted>
                 </View>
-              ))
-            )}
-          </Card>
-        ))}
+              ) : (
+                exercise.sets.map((set, index) => (
+                  <View
+                    key={set.id}
+                    style={[
+                      styles.setRow,
+                      {
+                        backgroundColor: set.completed
+                          ? theme.muted
+                          : 'transparent',
+                        opacity: set.completed ? 1 : 0.55,
+                      },
+                    ]}>
+                    <Muted style={{ width: 48 }}>Set {index + 1}</Muted>
+                    <Body style={{ flex: 1, fontWeight: '600' }}>
+                      {usesWeight(
+                        catalog?.equipment ?? exercise.equipment,
+                        exercise.muscleGroup
+                      )
+                        ? `${formatWeight(set.weight, weightUnit)} × ${set.reps} reps`
+                        : `${set.reps} reps`}
+                    </Body>
+                    <Muted>{set.completed ? 'Done' : 'Skipped'}</Muted>
+                  </View>
+                ))
+              )}
+            </Card>
+          );
+        })}
 
         <Button
           label={activeWorkout ? 'Continue current workout' : 'Repeat this workout'}
@@ -209,11 +215,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginTop: 8,
-  },
-  rowBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   setRow: {
     flexDirection: 'row',
