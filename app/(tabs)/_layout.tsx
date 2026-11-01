@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HeaderMenuButton, HeaderPageTitle } from '@/components/HeaderMenu';
+import { TabBarButton, TabBarGlyph } from '@/components/tab-bar-glyph';
 import Colors, { Typeface } from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
@@ -29,16 +29,23 @@ export default function TabLayout() {
             fontWeight: '600',
             ...(Platform.OS === 'web' ? { fontFamily: Typeface.web } : null),
           },
+          tabBarButton: (props) => <TabBarButton {...props} />,
           tabBarIconStyle: {
             width: 30,
             height: 30,
+            overflow: 'visible',
+          },
+          tabBarItemStyle: {
+            justifyContent: 'center',
+            overflow: 'visible',
           },
           tabBarStyle: {
             backgroundColor: palette.background,
             borderTopColor: palette.border,
             height: tabBarBody + insets.bottom,
-            paddingTop: 8,
+            paddingTop: 0,
             paddingBottom: insets.bottom,
+            overflow: 'hidden',
           },
           sceneStyle: {
             backgroundColor: 'transparent',
@@ -65,8 +72,8 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           headerLeft: () => <HeaderPageTitle label="Gym Tracker" />,
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="home" size={28} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarGlyph name="home" color={color} focused={focused} />
           ),
         }}
       />
@@ -75,8 +82,8 @@ export default function TabLayout() {
         options={{
           title: 'Progress',
           headerLeft: () => <HeaderPageTitle label="Your growth" />,
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="trending-up" size={28} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarGlyph name="trending-up" color={color} focused={focused} />
           ),
         }}
       />
@@ -85,8 +92,8 @@ export default function TabLayout() {
         options={{
           title: 'Exercises',
           headerLeft: () => <HeaderPageTitle label="Exercises" />,
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="barbell" size={28} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarGlyph name="barbell" color={color} focused={focused} />
           ),
         }}
       />
@@ -95,8 +102,8 @@ export default function TabLayout() {
         options={{
           title: 'History',
           headerLeft: () => <HeaderPageTitle label="History" />,
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="time" size={28} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarGlyph name="time" color={color} focused={focused} />
           ),
         }}
       />

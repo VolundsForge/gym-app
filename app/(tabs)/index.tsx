@@ -44,23 +44,25 @@ import {
 import type { WorkoutTemplate } from '@/types/workout';
 
 const RECENT_TILE_GAP = 12;
-/** Prefer squares this size so name, category pill, and meta stay readable. */
-const COMFORTABLE_RECENT_TILE = 142;
-/** Keep three-up on regular phones when each square still fits the contents. */
-const PHONE_RECENT_TILE = 100;
+/** Floor so a 2-line name, category pill, and two meta lines stay fully visible. */
+const MIN_RECENT_TILE = 148;
+/** Cap so 2-up tiles can be a bit roomy without turning into hollow squares. */
+const MAX_RECENT_TILE_HEIGHT = 164;
 const MAX_RECENT_COLUMNS = 10;
 
-function recentWorkoutColumns(contentWidth: number): number {
-  if (contentWidth <= 0) return 3;
-  const comfortable = Math.floor(
-    (contentWidth + RECENT_TILE_GAP) /
-      (COMFORTABLE_RECENT_TILE + RECENT_TILE_GAP)
+function recentTileWidth(contentWidth: number, columns: number): number {
+  if (columns <= 1) return Math.max(0, Math.floor(contentWidth));
+  return Math.floor(
+    (contentWidth - RECENT_TILE_GAP * (columns - 1)) / columns
   );
-  const threeSize = (contentWidth - 2 * RECENT_TILE_GAP) / 3;
-  if (threeSize >= PHONE_RECENT_TILE && comfortable < 3) {
-    return 3;
-  }
-  return Math.max(1, Math.min(MAX_RECENT_COLUMNS, comfortable));
+}
+
+function recentWorkoutColumns(contentWidth: number): number {
+  if (contentWidth <= 0) return 2;
+  const maxFit = Math.floor(
+    (contentWidth + RECENT_TILE_GAP) / (MIN_RECENT_TILE + RECENT_TILE_GAP)
+  );
+  return Math.max(1, Math.min(MAX_RECENT_COLUMNS, maxFit));
 }
 
 function compactRecentDate(iso: string): string {
@@ -135,9 +137,10 @@ export default function HomeScreen() {
     recentGridWidth > 0 ? recentGridWidth : windowWidth - gutter * 2;
   const recentColumns = recentWorkoutColumns(contentWidth);
   const recent = logged.slice(0, recentColumns * 2);
-  const recentTileWidth = Math.floor(
-    (contentWidth - RECENT_TILE_GAP * Math.max(0, recentColumns - 1)) /
-      recentColumns
+  const tileWidth = recentTileWidth(contentWidth, recentColumns);
+  const tileHeight = Math.max(
+    MIN_RECENT_TILE,
+    Math.min(tileWidth, MAX_RECENT_TILE_HEIGHT)
   );
   const returning =
     openedAppBefore || logged.length > 0 || templates.length > 0;
@@ -270,7 +273,8 @@ export default function HomeScreen() {
                     style={({ pressed }) => [
                       styles.recentTile,
                       {
-                        width: recentTileWidth,
+                        width: tileWidth,
+                        height: tileHeight,
                         backgroundColor: theme.card,
                         borderColor: theme.border,
                         opacity: pressed ? 0.85 : 1,
@@ -326,13 +330,12 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    paddingVertical: 20,
+    paddingTop: 8,
     gap: 16,
     paddingBottom: 40,
   },
   welcome: {
     gap: 4,
-    marginTop: 4,
   },
   welcomeTitle: {
     fontSize: 26,
@@ -350,8 +353,8 @@ const styles = StyleSheet.create({
     gap: RECENT_TILE_GAP,
   },
   recentTile: {
-    minWidth: 0,
-    aspectRatio: 1,
+    flexGrow: 0,
+    flexShrink: 0,
     borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     padding: 14,
@@ -359,14 +362,17 @@ const styles = StyleSheet.create({
   },
   recentTop: {
     gap: 8,
+    flexShrink: 0,
   },
   recentName: {
     fontWeight: '700',
     fontSize: 16,
     lineHeight: 21,
+    includeFontPadding: false,
   },
   recentMeta: {
     gap: 2,
+    flexShrink: 0,
   },
   recentFocusBadge: {
     maxWidth: '100%',
@@ -376,6 +382,7 @@ const styles = StyleSheet.create({
   recentMetaLine: {
     fontSize: 15,
     lineHeight: 20,
+    includeFontPadding: false,
   },
   centered: {
     alignItems: 'center',
